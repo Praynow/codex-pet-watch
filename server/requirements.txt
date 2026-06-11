@@ -1,0 +1,2 @@
+# No Python package dependencies are required.
+# The server loads codexbar_safe.py from CODEXBAR_SAFE_PATH.

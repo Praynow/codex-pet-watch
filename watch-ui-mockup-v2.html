@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Watch Pet UI V2</title>
+  <style>
+    :root {
+      --bg: #030507;
+      --blue: #1684ff;
+      --cyan: #4fc7ff;
+      --red: #ff4057;
+      --text: #cfe9ff;
+      --muted: #79a0c7;
+      --dim: #17345e;
+      --pet-row: 1;
+      --pet-frames: 8;
+      --pet-duration: 1100ms;
+      --sprite: url("wear-app/app/src/main/assets/pets/kabi/spritesheet.webp");
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background: #dfdedb;
+      font-family: Consolas, "Cascadia Mono", "Segoe UI Mono", monospace;
+      color: #1c252d;
+    }
+
+    .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 34px;
+      flex-wrap: wrap;
+    }
+
+    .watch {
+      width: 466px;
+      height: 466px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #050608;
+      box-shadow:
+        inset 0 0 0 10px #17191d,
+        inset 0 0 0 15px #050607,
+        0 18px 60px rgba(0,0,0,0.34);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screen {
+      width: 392px;
+      height: 392px;
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(25, 74, 138, 0.18), transparent 35%),
+        radial-gradient(circle at 50% 50%, #061018 0 48%, #020406 78%),
+        var(--bg);
+      box-shadow: inset 0 0 36px rgba(0, 104, 255, 0.16);
+    }
+
+    .scanlines {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.035) 0,
+        rgba(255,255,255,0.035) 1px,
+        transparent 2px,
+        transparent 5px
+      );
+      opacity: 0.03;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .title {
+      position: absolute;
+      top: 32px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: var(--blue);
+      font-size: 22px;
+      line-height: 1;
+      text-shadow: 0 0 8px rgba(22, 132, 255, 0.7);
+    }
+
+    .sync-dot {
+      position: absolute;
+      top: 58px;
+      left: 50%;
+      width: 5px;
+      height: 5px;
+      margin-left: -2.5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    .arc {
+      position: absolute;
+      inset: 54px;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.92;
+    }
+
+    .arc.blue {
+      background:
+        conic-gradient(from 38deg,
+          transparent 0 7deg,
+          var(--cyan) 7deg 29deg,
+          transparent 29deg 70deg,
+          var(--blue) 70deg 116deg,
+          transparent 116deg 216deg,
+          var(--blue) 216deg 258deg,
+          transparent 258deg 310deg,
+          var(--red) 310deg 332deg,
+          transparent 332deg 360deg);
+      mask: radial-gradient(circle, transparent 68%, #000 69% 72%, transparent 73%);
+    }
+
+    .arc.inner {
+      inset: 112px;
+      background:
+        conic-gradient(from 330deg,
+          transparent 0 18deg,
+          var(--blue) 18deg 96deg,
+          transparent 96deg 178deg,
+          var(--blue) 178deg 224deg,
+          transparent 224deg 360deg);
+      mask: radial-gradient(circle, transparent 67%, #000 68% 74%, transparent 75%);
+    }
+
+    .pet-stage {
+      position: absolute;
+      top: 84px;
+      left: 50%;
+      width: 120px;
+      height: 118px;
+      margin-left: -60px;
+      display: grid;
+      place-items: center;
+      overflow: visible;
+    }
+
+    .pet {
+      width: 192px;
+      height: 208px;
+      background-image: var(--sprite);
+      background-repeat: no-repeat;
+      background-size: 1536px 1872px;
+      background-position: 0 calc(var(--pet-row) * -208px);
+      transform: scale(0.42);
+      transform-origin: center bottom;
+      filter: drop-shadow(0 0 8px rgba(79, 199, 255, 0.45));
+      animation: petFrames var(--pet-duration) steps(var(--pet-frames)) infinite;
+    }
+
+    .side {
+      position: absolute;
+      top: 126px;
+      width: 112px;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.08;
+      text-shadow: 0 0 5px rgba(22,132,255,0.6);
+    }
+
+    .side.left {
+      left: 54px;
+      text-align: left;
+    }
+
+    .side.right {
+      right: 44px;
+      text-align: left;
+    }
+
+    .node {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 5px;
+      background: var(--red);
+      box-shadow: 0 0 7px var(--red);
+      vertical-align: 1px;
+    }
+
+    .side.right .node {
+      background: var(--cyan);
+      box-shadow: 0 0 7px var(--cyan);
+    }
+
+    .label {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .value {
+      color: #91caff;
+      margin-top: 5px;
+      font-size: 14px;
+    }
+
+    .micro {
+      color: var(--cyan);
+      font-size: 9px;
+      margin-top: 1px;
+    }
+
+    .metrics {
+      position: absolute;
+      left: 66px;
+      right: 58px;
+      top: 205px;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.2;
+    }
+
+    .metric-title {
+      text-align: left;
+      color: var(--red);
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-shadow: 0 0 8px rgba(255,64,87,0.55);
+    }
+
+    .metric-title .node {
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      margin-left: 5px;
+      margin-right: 0;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 52px 72px 1fr 38px;
+      align-items: center;
+      min-height: 25px;
+      gap: 8px;
+    }
+
+    .bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(23, 52, 94, 0.72);
+      overflow: hidden;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.7);
+    }
+
+    .fill {
+      display: block;
+      height: 100%;
+      width: var(--w);
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), #245dff);
+      box-shadow: 0 0 10px rgba(36,93,255,0.8);
+    }
+
+    .fill.red {
+      background: linear-gradient(90deg, #ff3050, #ff733e);
+      box-shadow: 0 0 10px rgba(255,64,87,0.8);
+    }
+
+    .activity {
+      margin-top: 12px;
+      text-align: center;
+      color: var(--text);
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .battery {
+      position: absolute;
+      bottom: 32px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .battery-icon {
+      width: 17px;
+      height: 8px;
+      border: 1px solid #a699ff;
+      border-radius: 2px;
+      position: relative;
+    }
+
+    .battery-icon::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      height: 2px;
+      width: 11px;
+      background: #a699ff;
+    }
+
+    .battery-icon::after {
+      content: "";
+      position: absolute;
+      right: -4px;
+      top: 2px;
+      width: 2px;
+      height: 4px;
+      background: #a699ff;
+    }
+
+    .controls {
+      width: 270px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .controls h1 {
+      margin: 0;
+      font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      font-size: 24px;
+      color: #17202a;
+    }
+
+    .controls p {
+      margin: 0 0 8px;
+      font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #53616d;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      min-height: 42px;
+      padding: 0 14px;
+      background: #fff;
+      color: #17202a;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+    }
+
+    button.active {
+      box-shadow: inset 0 0 0 2px var(--blue);
+      color: #0b58b9;
+    }
+
+    @keyframes petFrames {
+      from { background-position-x: 0; }
+      to { background-position-x: calc(var(--pet-frames) * -192px); }
+    }
+
+    [data-state="ready"] {
+      --pet-row: 1;
+      --pet-frames: 8;
+      --pet-duration: 1100ms;
+    }
+
+    [data-state="working"] {
+      --pet-row: 7;
+      --pet-frames: 6;
+      --pet-duration: 820ms;
+    }
+
+    [data-state="caution"] {
+      --pet-row: 8;
+      --pet-frames: 6;
+      --pet-duration: 1100ms;
+    }
+
+    [data-state="low"] {
+      --pet-row: 5;
+      --pet-frames: 8;
+      --pet-duration: 1320ms;
+    }
+  </style>
+</head>
+<body data-state="ready">
+  <main class="wrap">
+    <section class="watch" aria-label="Codex watch dashboard">
+      <div class="screen">
+        <div class="arc blue"></div>
+        <div class="arc inner"></div>
+        <div class="title">Codex</div>
+        <div class="sync-dot"></div>
+
+        <div class="pet-stage" aria-hidden="true">
+          <div class="pet"></div>
+        </div>
+
+        <div class="side left">
+          <div><span class="node"></span><span class="label">MODEL</span></div>
+          <div class="value">gpt-5.5</div>
+          <div class="micro">fast</div>
+        </div>
+
+        <div class="side right">
+          <div><span class="node"></span><span class="label">EFFORT</span></div>
+          <div class="value" id="effort">XHIGH</div>
+          <div class="micro">reasoning</div>
+        </div>
+
+        <section class="metrics">
+          <div class="metric-title">Live Metrics<span class="node"></span></div>
+          <div class="row">
+            <div>5H</div>
+            <div id="sessionText">4% used</div>
+            <div class="bar"><span class="fill red" id="sessionBar" style="--w: 4%"></span></div>
+            <div id="sessionPct" style="color: var(--red)">4%</div>
+          </div>
+          <div class="row">
+            <div>WEEK</div>
+            <div id="weekText">36% used</div>
+            <div class="bar"><span class="fill" id="weekBar" style="--w: 36%"></span></div>
+            <div id="weekPct" style="color: var(--blue)">36%</div>
+          </div>
+          <div class="activity">Activity</div>
+          <div class="row">
+            <div>DAY</div>
+            <div id="dayText">69 min</div>
+            <div class="bar"><span class="fill red" id="dayBar" style="--w: 23%"></span></div>
+            <div id="dayPct" style="color: var(--red)">23%</div>
+          </div>
+          <div class="row">
+            <div>WK</div>
+            <div id="wkText">1063 min</div>
+            <div class="bar"><span class="fill" id="wkBar" style="--w: 74%"></span></div>
+            <div id="wkPct" style="color: var(--blue)">74%</div>
+          </div>
+        </section>
+
+        <div class="battery"><span class="battery-icon"></span><span>99%</span></div>
+        <div class="scanlines"></div>
+      </div>
+    </section>
+
+    <aside class="controls">
+      <h1>V2 仪表盘模式</h1>
+      <p>参考图的布局被保留下来：标题、中央宠物、左右信息块、Live Metrics 和底部状态。</p>
+      <button class="active" data-set="ready">Ready · 低消耗</button>
+      <button data-set="working">Working · 正在跑任务</button>
+      <button data-set="caution">Caution · 接近紧张</button>
+      <button data-set="low">Low · 快用完</button>
+    </aside>
+  </main>
+
+  <script>
+    const states = {
+      ready: { effort: "XHIGH", session: 4, week: 36, day: 23, wk: 74, dayMin: 69, wkMin: 1063 },
+      working: { effort: "HIGH", session: 11, week: 38, day: 31, wk: 76, dayMin: 82, wkMin: 1091 },
+      caution: { effort: "MED", session: 68, week: 54, day: 62, wk: 83, dayMin: 186, wkMin: 1194 },
+      low: { effort: "LOW", session: 91, week: 77, day: 88, wk: 92, dayMin: 264, wkMin: 1322 }
+    };
+
+    const body = document.body;
+    const buttons = [...document.querySelectorAll("button[data-set]")];
+    const effort = document.getElementById("effort");
+    const sessionText = document.getElementById("sessionText");
+    const sessionPct = document.getElementById("sessionPct");
+    const sessionBar = document.getElementById("sessionBar");
+    const weekText = document.getElementById("weekText");
+    const weekPct = document.getElementById("weekPct");
+    const weekBar = document.getElementById("weekBar");
+    const dayText = document.getElementById("dayText");
+    const dayPct = document.getElementById("dayPct");
+    const dayBar = document.getElementById("dayBar");
+    const wkText = document.getElementById("wkText");
+    const wkPct = document.getElementById("wkPct");
+    const wkBar = document.getElementById("wkBar");
+
+    function applyState(name) {
+      const next = states[name];
+      body.dataset.state = name;
+      effort.textContent = next.effort;
+      sessionText.textContent = `${next.session}% used`;
+      sessionPct.textContent = `${next.session}%`;
+      sessionBar.style.setProperty("--w", `${next.session}%`);
+      weekText.textContent = `${next.week}% used`;
+      weekPct.textContent = `${next.week}%`;
+      weekBar.style.setProperty("--w", `${next.week}%`);
+      dayText.textContent = `${next.dayMin} min`;
+      dayPct.textContent = `${next.day}%`;
+      dayBar.style.setProperty("--w", `${next.day}%`);
+      wkText.textContent = `${next.wkMin} min`;
+      wkPct.textContent = `${next.wk}%`;
+      wkBar.style.setProperty("--w", `${next.wk}%`);
+      buttons.forEach((button) => button.classList.toggle("active", button.dataset.set === name));
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => applyState(button.dataset.set));
+    });
+  </script>
+</body>
+</html>

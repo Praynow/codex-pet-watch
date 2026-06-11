@@ -1,0 +1,5 @@
+<resources>
+  <string name="app_name">Codex Pet</string>
+  <string name="codex_usage_urls">http://127.0.0.1:8765/usage</string>
+  <string name="codex_watch_token"></string>
+</resources>

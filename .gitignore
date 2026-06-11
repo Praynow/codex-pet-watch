@@ -1,0 +1,38 @@
+# Local configuration and secrets
+config.local.ps1
+.env
+.env.*
+codex-watch-token.txt
+*.keystore
+*.jks
+*.p12
+
+# Runtime output
+*.log
+*.pid
+*.tmp
+__pycache__/
+*.py[cod]
+
+# Build output
+build/
+dist/
+*.apk
+*.aab
+*.ap_
+wear-app/.gradle/
+wear-app/local.properties
+wear-app/app/build/
+
+# Large local toolchains. Use Android Studio, system tools, or keep this folder locally.
+tools/
+
+# Generated screenshots and manual verification captures
+watch-screen*.png
+watch-ui-preview*.png
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

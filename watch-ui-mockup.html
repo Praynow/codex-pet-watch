@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Watch Pet UI Mockup</title>
+  <style>
+    :root {
+      --bg: #070909;
+      --panel: #101415;
+      --text: #f4f7f4;
+      --muted: #9aa6a1;
+      --ready: #58d68d;
+      --caution: #f4b942;
+      --low: #ef6262;
+      --working: #65a7ff;
+      --accent: var(--ready);
+      --pet-row: 0;
+      --pet-frames: 6;
+      --pet-duration: 1150ms;
+      --sprite: url("wear-app/app/src/main/assets/pets/yukino/spritesheet.webp");
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      gap: 24px;
+      padding: 32px;
+      background: #e8ecea;
+      color: #17201c;
+      font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    }
+
+    .workspace {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+
+    .watch {
+      width: 466px;
+      height: 466px;
+      border-radius: 50%;
+      position: relative;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.08), transparent 34%),
+        var(--bg);
+      box-shadow:
+        inset 0 0 0 16px #202524,
+        inset 0 0 0 20px #050606,
+        0 24px 70px rgba(12, 18, 15, 0.35);
+      overflow: hidden;
+    }
+
+    .screen {
+      width: 390px;
+      height: 390px;
+      border-radius: 50%;
+      position: relative;
+      display: grid;
+      justify-items: center;
+      align-content: start;
+      padding: 32px 38px 28px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04), transparent 32%),
+        var(--bg);
+    }
+
+    .ring {
+      position: absolute;
+      inset: 22px;
+      border-radius: 50%;
+      background:
+        conic-gradient(var(--accent) calc(var(--percent) * 1%), rgba(255,255,255,0.09) 0);
+      mask: radial-gradient(circle, transparent 62%, #000 63%);
+      opacity: 0.95;
+    }
+
+    .status {
+      margin-top: 8px;
+      color: var(--accent);
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .quota {
+      margin-top: 18px;
+      color: var(--text);
+      font-size: 74px;
+      line-height: 0.9;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .quota span {
+      font-size: 28px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .subline {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.2;
+      max-width: 270px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .pet-stage {
+      position: absolute;
+      left: 50%;
+      bottom: 54px;
+      width: 134px;
+      height: 146px;
+      translate: -50% 0;
+      display: grid;
+      place-items: center;
+      overflow: visible;
+    }
+
+    .pet {
+      width: 192px;
+      height: 208px;
+      background-image: var(--sprite);
+      background-repeat: no-repeat;
+      background-size: 1536px 1872px;
+      background-position: 0 calc(var(--pet-row) * -208px);
+      transform: scale(0.64);
+      animation: petFrames var(--pet-duration) steps(var(--pet-frames)) infinite;
+      transform-origin: center bottom;
+      image-rendering: auto;
+      filter: drop-shadow(0 7px 8px rgba(0, 0, 0, 0.42));
+    }
+
+    .bottom {
+      position: absolute;
+      bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    .details {
+      width: 260px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .details h1 {
+      margin: 0 0 4px;
+      font-size: 21px;
+      line-height: 1.2;
+      color: #18201c;
+    }
+
+    .details p {
+      margin: 0 0 10px;
+      color: #52605a;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      display: grid;
+      gap: 8px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      min-height: 42px;
+      border-radius: 8px;
+      padding: 0 14px;
+      background: #ffffff;
+      color: #17201c;
+      font: inherit;
+      font-size: 14px;
+      text-align: left;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+      cursor: pointer;
+    }
+
+    button.active {
+      color: #07100c;
+      background: color-mix(in srgb, var(--accent) 36%, white);
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    .tile-preview {
+      width: 188px;
+      height: 188px;
+      border-radius: 50%;
+      background: #070909;
+      color: var(--text);
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 8px #202524;
+      display: grid;
+      place-items: center;
+      margin-top: 8px;
+    }
+
+    .tile-ring {
+      position: absolute;
+      inset: 18px;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent) calc(var(--percent) * 1%), rgba(255,255,255,0.1) 0);
+      mask: radial-gradient(circle, transparent 68%, #000 69%);
+    }
+
+    .tile-number {
+      position: relative;
+      z-index: 1;
+      margin-top: -20px;
+      font-size: 46px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tile-label {
+      position: absolute;
+      bottom: 34px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    @keyframes petFrames {
+      from {
+        background-position-x: 0;
+      }
+      to {
+        background-position-x: calc(var(--pet-frames) * -192px);
+      }
+    }
+
+    [data-state="ready"] {
+      --accent: var(--ready);
+      --percent: 89;
+      --pet-row: 0;
+      --pet-frames: 6;
+      --pet-duration: 1150ms;
+    }
+
+    [data-state="caution"] {
+      --accent: var(--caution);
+      --percent: 28;
+      --pet-row: 8;
+      --pet-frames: 6;
+      --pet-duration: 1050ms;
+    }
+
+    [data-state="low"] {
+      --accent: var(--low);
+      --percent: 9;
+      --pet-row: 5;
+      --pet-frames: 8;
+      --pet-duration: 1300ms;
+    }
+
+    [data-state="working"] {
+      --accent: var(--working);
+      --percent: 63;
+      --pet-row: 7;
+      --pet-frames: 6;
+      --pet-duration: 860ms;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 20px;
+      }
+      .watch {
+        width: 360px;
+        height: 360px;
+      }
+      .screen {
+        width: 306px;
+        height: 306px;
+        padding-top: 26px;
+      }
+      .quota {
+        margin-top: 12px;
+        font-size: 54px;
+      }
+      .subline {
+        font-size: 13px;
+      }
+      .pet-stage {
+        bottom: 43px;
+        scale: 0.8;
+      }
+      .bottom {
+        bottom: 20px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body data-state="ready">
+  <main class="workspace">
+    <section class="watch" aria-label="Codex watch app main screen">
+      <div class="screen">
+        <div class="ring"></div>
+        <div class="status" id="status">READY</div>
+        <div class="quota"><span id="quota">89</span><span>%</span></div>
+        <div class="subline" id="subline">5 小时额度充足</div>
+        <div class="pet-stage" aria-hidden="true">
+          <div class="pet"></div>
+        </div>
+        <div class="bottom"><span class="dot"></span><span id="reset">1小时 52分钟 后重置</span></div>
+      </div>
+    </section>
+
+    <aside class="details">
+      <h1>Codex 手表主屏</h1>
+      <p>圆形首屏优先展示 5 小时额度，宠物使用现有 Codex 图集按状态切换动画。</p>
+      <div class="controls" aria-label="Preview state controls">
+        <button class="active" data-set="ready">Ready · 额度充足</button>
+        <button data-set="working">Working · Codex 正在跑</button>
+        <button data-set="caution">Caution · 接近紧张</button>
+        <button data-set="low">Low · 快用完</button>
+      </div>
+      <div class="tile-preview" aria-label="Codex tile preview">
+        <div class="tile-ring"></div>
+        <div class="tile-number" id="tileQuota">89%</div>
+        <div class="tile-label">Codex · Weekly 98%</div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const states = {
+      ready: {
+        status: "READY",
+        quota: "89",
+        subline: "5 小时额度充足",
+        reset: "1小时 52分钟 后重置"
+      },
+      working: {
+        status: "WORKING",
+        quota: "63",
+        subline: "Codex 正在处理任务",
+        reset: "本机刚刚同步"
+      },
+      caution: {
+        status: "CAUTION",
+        quota: "28",
+        subline: "开始节省高强度任务",
+        reset: "42分钟 后重置"
+      },
+      low: {
+        status: "LOW",
+        quota: "9",
+        subline: "建议等待额度恢复",
+        reset: "18分钟 后重置"
+      }
+    };
+
+    const body = document.body;
+    const status = document.getElementById("status");
+    const quota = document.getElementById("quota");
+    const tileQuota = document.getElementById("tileQuota");
+    const subline = document.getElementById("subline");
+    const reset = document.getElementById("reset");
+    const buttons = [...document.querySelectorAll("button[data-set]")];
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const next = button.dataset.set;
+        const data = states[next];
+        body.dataset.state = next;
+        status.textContent = data.status;
+        quota.textContent = data.quota;
+        tileQuota.textContent = `${data.quota}%`;
+        subline.textContent = data.subline;
+        reset.textContent = data.reset;
+        buttons.forEach((item) => item.classList.toggle("active", item === button));
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.gradle text eol=lf
+*.java text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.properties text eol=lf
+*.py text eol=lf
+*.xml text eol=lf
+*.html text eol=lf
+*.jar binary
+*.png binary
+*.webp binary
