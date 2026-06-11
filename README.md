@@ -5,7 +5,8 @@
 ## 功能概览
 
 - Wear OS 圆形表盘界面，适配 OPPO Watch X2 等 Wear OS 手表。
-- 内置宠物动画，可在手表上切换宠物和互动页面。
+- 默认使用纯代码绘制的占位宠物，不包含第三方宠物图片素材。
+- 支持用户自行添加有授权的宠物 spritesheet。
 - Windows 本地服务读取 Codex CLI 用量日志。
 - 支持 USB 调试、局域网地址和公网隧道三种同步方式。
 - 手表每 5 分钟自动刷新，也可以点击表盘立即刷新。
@@ -19,7 +20,7 @@
 │  ├─ codex_watch_server.py         HTTP API 服务
 │  └─ codex_usage_reader.py         内置 Codex 用量读取器
 ├─ wear-app/                        Wear OS Android 应用
-│  └─ app/src/main/assets/pets/      宠物素材
+│  └─ app/src/main/assets/pets/      可选自定义宠物素材目录
 ├─ scripts/                         打包和辅助脚本
 ├─ config.example.ps1               本地配置模板
 ├─ build-apk.ps1                    构建调试 APK
@@ -189,6 +190,36 @@ $env:CLOUDFLARED_TUNNEL_TOKEN = "YOUR_TUNNEL_TOKEN"
 
 也可以把 token 写入 `config.local.ps1`。没有 token 时，脚本会尝试启动临时 Quick Tunnel。
 
+## 自定义宠物素材
+
+仓库默认不包含任何宠物图片素材，以避免版权风险。应用会在没有素材时显示一个纯代码绘制的占位宠物。
+
+如果要添加自己的宠物素材，请创建：
+
+```text
+wear-app\app\src\main\assets\pets\YOUR_PET_ID\
+```
+
+目录内放入：
+
+```text
+pet.json
+spritesheet.webp
+```
+
+`pet.json` 示例：
+
+```json
+{
+  "id": "my-pet",
+  "displayName": "My Pet",
+  "description": "A custom pet I own or have permission to distribute.",
+  "spritesheetPath": "spritesheet.webp"
+}
+```
+
+请只提交你拥有版权、已获得授权、或明确可公开分发的素材。
+
 ## 本地配置和安全
 
 仓库不会提交这些本地文件：
@@ -199,6 +230,7 @@ $env:CLOUDFLARED_TUNNEL_TOKEN = "YOUR_TUNNEL_TOKEN"
 - 日志、pid、APK、构建产物
 - 本机 `tools/` 工具链缓存
 - 手动验证截图
+- 未确认授权的宠物图片素材
 
 公开前可以生成一个干净源码包：
 
@@ -216,9 +248,6 @@ dist\codex-watch-pet-source.zip
 
 核心用量读取器已经包含在 `server/codex_usage_reader.py`，不依赖外部 CodexBar 项目。
 
-发布前请确认：
-
-- 已添加你希望使用的开源许可证。
-- `wear-app/app/src/main/assets/pets/` 中的宠物素材允许公开分发。
+发布前请确认已添加你希望使用的开源许可证。
 
 `server/codex_usage_reader.py` 的部分逻辑来自 CodexBar Safe，相关 MIT 许可证声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

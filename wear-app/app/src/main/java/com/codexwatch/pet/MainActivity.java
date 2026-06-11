@@ -438,7 +438,7 @@ public class MainActivity extends Activity {
                 loaded.clear();
             }
             if (loaded.isEmpty()) {
-                loaded.add(new PetOption("yukino", "yukino", "spritesheet.webp"));
+                loaded.add(new PetOption("builtin", "Built-in", ""));
             }
             return new PetCatalog(loaded);
         }
@@ -454,7 +454,7 @@ public class MainActivity extends Activity {
 
         int defaultPetIndex() {
             for (int i = 0; i < pets.size(); i++) {
-                if ("yukino".equals(pets.get(i).id)) {
+                if ("builtin".equals(pets.get(i).id)) {
                     return i;
                 }
             }
@@ -740,9 +740,6 @@ public class MainActivity extends Activity {
         }
 
         private void drawPet(Canvas canvas) {
-            if (sprite == null) {
-                return;
-            }
             drawPetFrame(canvas, petRow(usage.petState), petFrames(usage.petState), 161, 168, 231, 244);
         }
 
@@ -827,6 +824,7 @@ public class MainActivity extends Activity {
 
         private void drawPetFrame(Canvas canvas, int row, int frames, float left, float top, float right, float bottom) {
             if (sprite == null) {
+                drawBuiltInPet(canvas, row, left, top, right, bottom);
                 return;
             }
             int safeFrames = Math.max(1, frames);
@@ -836,13 +834,77 @@ public class MainActivity extends Activity {
             canvas.drawBitmap(sprite, src, dst, spritePaint);
         }
 
+        private void drawBuiltInPet(Canvas canvas, int row, float left, float top, float right, float bottom) {
+            float width = right - left;
+            float height = bottom - top;
+            float cx = (left + right) / 2f;
+            float tick = SystemClock.uptimeMillis() / 260f;
+            float bob = row == 1 ? (float) Math.sin(tick) * height * 0.04f : (float) Math.sin(tick) * height * 0.015f;
+            float y = top + bob;
+            int accent = row == 5 ? COL_RED : row == 8 ? COL_BLUE : row == 1 ? COL_GREEN : Color.rgb(191, 231, 255);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(46, 90, 226, 154));
+            temp.set(left + width * 0.16f, bottom - height * 0.12f, right - width * 0.16f, bottom - height * 0.03f);
+            canvas.drawOval(temp, paint);
+
+            paint.setColor(Color.rgb(18, 37, 44));
+            temp.set(cx - width * 0.27f, y + height * 0.38f, cx + width * 0.27f, y + height * 0.84f);
+            canvas.drawRoundRect(temp, width * 0.14f, width * 0.14f, paint);
+
+            paint.setColor(accent);
+            temp.set(cx - width * 0.34f, y + height * 0.14f, cx + width * 0.34f, y + height * 0.57f);
+            canvas.drawOval(temp, paint);
+
+            paint.setColor(Color.rgb(237, 248, 255));
+            temp.set(cx - width * 0.20f, y + height * 0.29f, cx - width * 0.10f, y + height * 0.39f);
+            canvas.drawOval(temp, paint);
+            temp.set(cx + width * 0.10f, y + height * 0.29f, cx + width * 0.20f, y + height * 0.39f);
+            canvas.drawOval(temp, paint);
+
+            paint.setColor(COL_BG);
+            if (row == 5) {
+                paint.setStrokeWidth(Math.max(2f, width * 0.035f));
+                canvas.drawLine(cx - width * 0.20f, y + height * 0.34f, cx - width * 0.10f, y + height * 0.34f, paint);
+                canvas.drawLine(cx + width * 0.10f, y + height * 0.34f, cx + width * 0.20f, y + height * 0.34f, paint);
+            } else {
+                temp.set(cx - width * 0.16f, y + height * 0.32f, cx - width * 0.12f, y + height * 0.36f);
+                canvas.drawOval(temp, paint);
+                temp.set(cx + width * 0.12f, y + height * 0.32f, cx + width * 0.16f, y + height * 0.36f);
+                canvas.drawOval(temp, paint);
+            }
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeWidth(Math.max(2f, width * 0.035f));
+            paint.setColor(Color.rgb(237, 248, 255));
+            float mouthY = y + height * 0.45f;
+            if (row == 8) {
+                canvas.drawLine(cx - width * 0.08f, mouthY, cx + width * 0.08f, mouthY, paint);
+            } else if (row == 5) {
+                temp.set(cx - width * 0.10f, mouthY, cx + width * 0.10f, mouthY + height * 0.10f);
+                canvas.drawArc(temp, 200, 140, false, paint);
+            } else {
+                temp.set(cx - width * 0.10f, mouthY - height * 0.05f, cx + width * 0.10f, mouthY + height * 0.06f);
+                canvas.drawArc(temp, 25, 130, false, paint);
+            }
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(accent);
+        }
+
         private void drawCenteredText(Canvas canvas, String text, float baseline, Paint p) {
             canvas.drawText(text, 196 - p.measureText(text) / 2f, baseline, p);
         }
 
         private void loadSprite() {
             PetOption selected = catalog.selected(settings);
-            if (selected.id.equals(loadedPetId) && sprite != null) {
+            if (selected.id.equals(loadedPetId)) {
+                return;
+            }
+            if (selected.spritesheetPath == null || selected.spritesheetPath.trim().isEmpty()) {
+                sprite = null;
+                loadedPetId = selected.id;
                 return;
             }
             try (InputStream stream = getContext().getAssets().open("pets/" + selected.id + "/" + selected.spritesheetPath)) {
@@ -850,7 +912,7 @@ public class MainActivity extends Activity {
                 loadedPetId = selected.id;
             } catch (Exception ignored) {
                 sprite = null;
-                loadedPetId = "";
+                loadedPetId = selected.id;
             }
         }
 

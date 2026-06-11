@@ -5,7 +5,8 @@
 ## 功能
 
 - 圆形手表界面，展示 Codex 5 小时额度、周额度和 token 用量。
-- 宠物精灵图动画。
+- 默认使用纯代码绘制的占位宠物，不包含第三方宠物图片素材。
+- 可自行添加有授权的宠物 spritesheet。
 - 用量、互动、设置三个页面。
 - 依次尝试多个服务地址。
 - 服务不可达时保留最后一次有效数据并显示离线状态。
@@ -49,6 +50,36 @@ APK 输出：
 ```text
 wear-app\app\build\outputs\apk\debug\app-debug.apk
 ```
+
+## 自定义宠物素材
+
+默认仓库不带宠物图片素材。没有素材时，应用会显示内置的代码占位宠物。
+
+要添加自己的宠物，请创建：
+
+```text
+app\src\main\assets\pets\YOUR_PET_ID\
+```
+
+目录内放入：
+
+```text
+pet.json
+spritesheet.webp
+```
+
+`pet.json` 示例：
+
+```json
+{
+  "id": "my-pet",
+  "displayName": "My Pet",
+  "description": "A custom pet I own or have permission to distribute.",
+  "spritesheetPath": "spritesheet.webp"
+}
+```
+
+请只使用你拥有版权、已获得授权、或明确可公开分发的素材。
 
 ## 安装到手表
 

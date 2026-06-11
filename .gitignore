@@ -30,6 +30,8 @@ tools/
 # Generated screenshots and manual verification captures
 watch-screen*.png
 watch-ui-preview*.png
+watch-ui-design*.md
+watch-ui-mockup*.html
 
 # OS/editor noise
 .DS_Store
