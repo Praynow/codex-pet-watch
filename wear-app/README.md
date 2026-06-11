@@ -35,6 +35,16 @@
 
 地址会从左到右依次尝试。推荐顺序是公网隧道、局域网地址、USB 回退地址。
 
+脚本默认写入本地 debug 覆盖文件：
+
+```text
+app\src\debug\res\values\codex_watch_local.xml
+```
+
+这个文件被 Git 忽略，不会上传。debug APK 构建时会自动使用它覆盖公开默认地址和 token。脚本也会同步更新根目录的 `codex-watch-token.txt`。
+
+如果要修改公开默认资源，可以传入 `-PublicDefaults`，但开源发布前通常不需要这样做。
+
 ## 构建
 
 从项目根目录运行：

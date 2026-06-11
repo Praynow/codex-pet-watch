@@ -136,6 +136,16 @@ $env:CODEX_WATCH_TOKEN = ""
 
 地址会从左到右依次尝试。推荐顺序是公网隧道、局域网地址、USB 回退地址。
 
+默认情况下，脚本会写入本地 debug 覆盖文件：
+
+```text
+wear-app\app\src\debug\res\values\codex_watch_local.xml
+```
+
+这个文件被 Git 忽略，不会上传到 GitHub；但构建 debug APK 时会自动覆盖公开默认配置。脚本也会把 token 同步写入本地的 `codex-watch-token.txt`，让 Windows 服务和手表应用使用同一个 token。
+
+如果你真的想修改公开默认资源，可以额外传入 `-PublicDefaults`。一般不建议这样做。
+
 ## 构建 APK
 
 回到项目根目录：
@@ -226,6 +236,8 @@ spritesheet.webp
 
 - `config.local.ps1`
 - `codex-watch-token.txt`
+- `wear-app/app/src/debug/res/values/codex_watch_local.xml`
+- `wear-app/app/src/debug/assets/pets/`
 - `wear-app/local.properties`
 - 日志、pid、APK、构建产物
 - 本机 `tools/` 工具链缓存

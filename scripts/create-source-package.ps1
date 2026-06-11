@@ -27,6 +27,7 @@ $excludedDirPrefixes = @(
     "dist/",
     "tools/",
     "wear-app/.gradle/",
+    "wear-app/app/src/debug/assets/pets/",
     "wear-app/app/build/"
 )
 
@@ -34,6 +35,7 @@ $excludedExactFiles = @(
     ".env",
     "config.local.ps1",
     "codex-watch-token.txt",
+    "wear-app/app/src/debug/res/values/codex_watch_local.xml",
     "wear-app/local.properties"
 )
 

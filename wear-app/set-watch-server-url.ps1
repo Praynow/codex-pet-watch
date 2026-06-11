@@ -1,7 +1,8 @@
 param(
     [string]$Url,
     [string[]]$Urls,
-    [string]$Token
+    [string]$Token,
+    [switch]$PublicDefaults
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +14,9 @@ if (Test-Path $configLoader) {
     . $configLoader
 }
 
-$stringsPath = Join-Path $scriptDir "app\src\main\res\values\strings.xml"
+$mainStringsPath = Join-Path $scriptDir "app\src\main\res\values\strings.xml"
+$localStringsPath = Join-Path $scriptDir "app\src\debug\res\values\codex_watch_local.xml"
+$stringsPath = if ($PublicDefaults) { $mainStringsPath } else { $localStringsPath }
 $tokenPath = Join-Path $projectDir "codex-watch-token.txt"
 $port = if ($env:CODEX_WATCH_PORT) { $env:CODEX_WATCH_PORT } else { "8765" }
 
@@ -35,6 +38,53 @@ function Normalize-UsageUrl {
         $normalized = $normalized.TrimEnd("/") + "/usage"
     }
     return $normalized
+}
+
+function Ensure-StringResourceFile {
+    param([string]$Path)
+
+    if (Test-Path $Path) {
+        return
+    }
+
+    $parent = Split-Path -Parent $Path
+    New-Item -ItemType Directory -Path $parent -Force | Out-Null
+
+    $doc = New-Object System.Xml.XmlDocument
+    $resources = $doc.CreateElement("resources")
+    $doc.AppendChild($resources) | Out-Null
+
+    foreach ($name in @("codex_usage_urls", "codex_watch_token")) {
+        $node = $doc.CreateElement("string")
+        $attr = $doc.CreateAttribute("name")
+        $attr.Value = $name
+        $node.Attributes.Append($attr) | Out-Null
+        if ($name -eq "codex_usage_urls") {
+            $node.InnerText = "http://127.0.0.1:$port/usage"
+        }
+        $resources.AppendChild($node) | Out-Null
+    }
+
+    $doc.Save($Path)
+}
+
+function Get-OrAddStringNode {
+    param(
+        [xml]$Xml,
+        [string]$Name
+    )
+
+    $node = $Xml.resources.string | Where-Object { $_.name -eq $Name } | Select-Object -First 1
+    if ($node) {
+        return $node
+    }
+
+    $node = $Xml.CreateElement("string")
+    $attr = $Xml.CreateAttribute("name")
+    $attr.Value = $Name
+    $node.Attributes.Append($attr) | Out-Null
+    $Xml.resources.AppendChild($node) | Out-Null
+    return $node
 }
 
 if (-not $Url -and -not $Urls -and -not $Token) {
@@ -71,6 +121,7 @@ if (-not $Url -and -not $Urls -and -not $Token) {
     }
 }
 
+Ensure-StringResourceFile $stringsPath
 [xml]$xml = Get-Content $stringsPath
 if ($Url -and -not $Urls) {
     $Urls = @(Normalize-UsageUrl $Url)
@@ -78,21 +129,24 @@ if ($Url -and -not $Urls) {
 
 if ($Urls) {
     $Urls = $Urls | ForEach-Object { Normalize-UsageUrl $_ } | Where-Object { $_ } | Select-Object -Unique
-    $urlsNode = $xml.resources.string | Where-Object { $_.name -eq "codex_usage_urls" }
-    if (-not $urlsNode) {
-        throw "codex_usage_urls string not found in $stringsPath"
-    }
+    $urlsNode = Get-OrAddStringNode -Xml $xml -Name "codex_usage_urls"
     $urlsNode.InnerText = ($Urls -join ",")
     Write-Host "Updated codex_usage_urls to $($Urls -join ',')" -ForegroundColor Green
 }
 
 if ($Token) {
-    $tokenNode = $xml.resources.string | Where-Object { $_.name -eq "codex_watch_token" }
-    if (-not $tokenNode) {
-        throw "codex_watch_token string not found in $stringsPath"
-    }
+    $tokenNode = Get-OrAddStringNode -Xml $xml -Name "codex_watch_token"
     $tokenNode.InnerText = $Token
     Write-Host "Updated codex_watch_token." -ForegroundColor Green
+    if (-not $PublicDefaults) {
+        Set-Content -Path $tokenPath -Value $Token
+        Write-Host "Updated local codex-watch-token.txt." -ForegroundColor Green
+    }
 }
 
 $xml.Save($stringsPath)
+if ($PublicDefaults) {
+    Write-Host "Wrote public default resources: $stringsPath" -ForegroundColor Cyan
+} else {
+    Write-Host "Wrote local debug resources: $stringsPath" -ForegroundColor Cyan
+}
