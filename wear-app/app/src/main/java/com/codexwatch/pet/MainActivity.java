@@ -22,6 +22,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
@@ -230,6 +231,8 @@ public class MainActivity extends Activity {
         String resetCardLabel = "--";
         String resetCardDetail = "NOT SET";
         boolean resetCardUrgent = false;
+        final List<String> resetCardDetails = new ArrayList<>();
+        final List<Boolean> resetCardUrgencies = new ArrayList<>();
         String petState = "idle";
         boolean online = true;
         boolean stale = false;
@@ -268,6 +271,8 @@ public class MainActivity extends Activity {
             data.resetCardLabel = resetCardLabel;
             data.resetCardDetail = resetCardDetail;
             data.resetCardUrgent = resetCardUrgent;
+            data.resetCardDetails.addAll(resetCardDetails);
+            data.resetCardUrgencies.addAll(resetCardUrgencies);
             data.petState = petState;
             data.online = online;
             data.stale = stale;
@@ -283,6 +288,7 @@ public class MainActivity extends Activity {
             JSONObject pet = root.optJSONObject("pet");
             JSONObject sync = root.optJSONObject("sync");
             JSONObject resetCard = root.optJSONObject("reset_card");
+            JSONObject resetCards = root.optJSONObject("reset_cards");
             boolean syncFresh = sync == null || sync.optBoolean("fresh", true);
             String syncAge = sync == null ? "unknown" : sync.optString("source_age_label", "unknown");
             data.hasRealData = root.optBoolean("available", true);
@@ -303,20 +309,70 @@ public class MainActivity extends Activity {
                 data.sevenDays = tokens.optString("last_7_days_label", data.sevenDays);
             }
             data.model = root.optString("model", data.model);
-            if (resetCard != null && resetCard.optBoolean("available", false)) {
-                String expires = resetCard.optString("expires_label", "--");
-                String remaining = resetCard.optString("expires_in", "unknown");
-                data.resetCardLabel = expires;
-                data.resetCardDetail = "expired".equalsIgnoreCase(remaining)
-                        ? "EXPIRED"
-                        : expires + " " + remaining.toUpperCase(Locale.US);
+            if (resetCards != null && resetCards.optBoolean("available", false)) {
+                int usableCount = Math.max(0, resetCards.optInt("usable_count", 0));
+                data.resetCardLabel = cardCountLabel(usableCount);
+                data.resetCardUrgent = resetCards.optBoolean("urgent", false);
+                JSONArray cards = resetCards.optJSONArray("cards");
+                if (cards != null) {
+                    for (int i = 0; i < cards.length(); i++) {
+                        JSONObject card = cards.optJSONObject(i);
+                        if (card == null || !card.optBoolean("available", false)) {
+                            continue;
+                        }
+                        int count = Math.max(1, card.optInt("count", 1));
+                        String date = card.optString("expires_date_label", "--");
+                        String time = card.optString("expires_time_label", "--");
+                        boolean expired = card.optBoolean("expired", false);
+                        data.resetCardDetails.add(expired
+                                ? count + "x " + date + " EXPIRED"
+                                : count + "x " + date + " " + time);
+                        data.resetCardUrgencies.add(card.optBoolean("urgent", false));
+                    }
+                }
+                data.resetCardDetail = data.resetCardDetails.isEmpty()
+                        ? cardCountLabel(usableCount)
+                        : data.resetCardDetails.get(0);
+            } else if (resetCard != null && resetCard.optBoolean("available", false)) {
+                int count = Math.max(1, resetCard.optInt("count", 1));
+                String date = resetCard.optString("expires_date_label", resetCard.optString("expires_label", "--"));
+                String time = resetCard.optString("expires_time_label", "--");
+                boolean expired = resetCard.optBoolean("expired", false);
+                data.resetCardLabel = cardCountLabel(expired ? 0 : count);
+                data.resetCardDetail = expired ? count + "x " + date + " EXPIRED" : count + "x " + date + " " + time;
                 data.resetCardUrgent = resetCard.optBoolean("urgent", false);
+                data.resetCardDetails.add(data.resetCardDetail);
+                data.resetCardUrgencies.add(data.resetCardUrgent);
             }
             if (pet != null) {
                 data.petState = pet.optString("state", data.petState);
             }
             data.online = root.optBoolean("available", true);
             return data;
+        }
+
+        int resetCardGroupCount() {
+            return resetCardDetails.size();
+        }
+
+        String resetCardDetailAt(int index) {
+            if (resetCardDetails.isEmpty()) {
+                return resetCardDetail;
+            }
+            int safeIndex = Math.max(0, Math.min(resetCardDetails.size() - 1, index));
+            return resetCardDetails.get(safeIndex);
+        }
+
+        boolean resetCardUrgentAt(int index) {
+            if (resetCardUrgencies.isEmpty()) {
+                return resetCardUrgent;
+            }
+            int safeIndex = Math.max(0, Math.min(resetCardUrgencies.size() - 1, index));
+            return resetCardUrgencies.get(safeIndex);
+        }
+
+        private static String cardCountLabel(int count) {
+            return count + (count == 1 ? " CARD" : " CARDS");
         }
 
         private static int clamp(int value) {
@@ -529,6 +585,7 @@ public class MainActivity extends Activity {
         private Runnable tapHandler;
         private int page = PAGE_USAGE;
         private int playActionIndex = 0;
+        private int resetCardGroupIndex = 0;
         private String loadedPetId = "";
         private float downX;
         private float downY;
@@ -548,6 +605,8 @@ public class MainActivity extends Activity {
 
         void setUsage(UsageData usage) {
             this.usage = usage;
+            int groups = usage.resetCardGroupCount();
+            resetCardGroupIndex = groups == 0 ? 0 : Math.min(resetCardGroupIndex, groups - 1);
             invalidate();
         }
 
@@ -655,7 +714,17 @@ public class MainActivity extends Activity {
             drawPetFrame(canvas, 3, 4, 154, 49, 238, 140);
             drawSettingRow(canvas, 154, "PET", catalog.selected(settings).displayName, COL_GREEN);
             drawSettingRow(canvas, 210, "MODEL (AUTO)", usage.model, COL_BLUE);
-            drawSettingRow(canvas, 266, "RESET CARD", usage.resetCardDetail, usage.resetCardUrgent ? COL_RED : COL_GREEN);
+            int groups = usage.resetCardGroupCount();
+            String resetLabel = groups > 1
+                    ? "RESET CARDS " + (resetCardGroupIndex + 1) + "/" + groups
+                    : "RESET CARDS";
+            drawResetCardRow(
+                    canvas,
+                    266,
+                    resetLabel,
+                    usage.resetCardDetailAt(resetCardGroupIndex),
+                    usage.resetCardUrgentAt(resetCardGroupIndex) ? COL_RED : COL_GREEN
+            );
         }
 
         private void drawTitle(Canvas canvas, String title) {
@@ -795,6 +864,28 @@ public class MainActivity extends Activity {
             paint.setColor(COL_TEXT);
             String compactValue = fit(value, 9);
             canvas.drawText(compactValue, 326 - paint.measureText(compactValue), y + 31, paint);
+        }
+
+        private void drawResetCardRow(Canvas canvas, float y, String label, String value, int accent) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(COL_PANEL);
+            temp.set(56, y, 336, y + 44);
+            canvas.drawRoundRect(temp, 8, 8, paint);
+
+            paint.setColor(accent);
+            temp.set(56, y, 60, y + 44);
+            canvas.drawRoundRect(temp, 2, 2, paint);
+
+            paint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL));
+            paint.setTextSize(10);
+            paint.setColor(COL_MUTED);
+            canvas.drawText(label, 74, y + 16, paint);
+
+            paint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+            paint.setTextSize(14);
+            paint.setColor(COL_TEXT);
+            String compactValue = fit(value, 16);
+            canvas.drawText(compactValue, 326 - paint.measureText(compactValue), y + 34, paint);
         }
 
         private void drawPageDots(Canvas canvas) {
@@ -949,6 +1040,8 @@ public class MainActivity extends Activity {
             if (y >= 148 && y <= 202) {
                 settings.nextPet(catalog.size());
                 loadSprite();
+            } else if (y >= 260 && y <= 318 && usage.resetCardGroupCount() > 1) {
+                resetCardGroupIndex = (resetCardGroupIndex + 1) % usage.resetCardGroupCount();
             } else {
                 changed = false;
             }

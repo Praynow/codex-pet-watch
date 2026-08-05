@@ -82,13 +82,15 @@ notepad .\config.local.ps1
 $env:CODEX_WATCH_CODEX_DIR = "C:\path\to\.codex"
 ```
 
-如果账户中有尚未使用的 Codex 用量重置卡，可把控制台显示的到期日期填入本地配置：
+如果账户中有尚未使用的 Codex 用量重置卡，可按到期时间和数量写入本地配置：
 
 ```powershell
-$env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = "2026-08-31"
+$env:CODEX_WATCH_RESET_CARDS_JSON = '[{"expires_at":"2030-01-15T09:00:00+08:00","count":2},{"expires_at":"2030-02-01","count":1}]'
 ```
 
-支持 `YYYY-MM-DD` 或 ISO 8601 时间。此值仅保存在 `config.local.ps1`，服务不会从账号页面或浏览器中抓取数据；留空时手表显示 `NOT SET`。
+支持 `YYYY-MM-DD` 或 ISO 8601 时间。相同到期时间的卡可以合并并增加 `count`。服务会返回总可用数量、临期数量、过期数量和按时间排序的全部批次；手表首页显示可用卡总数，设置页点击 `RESET CARDS` 可轮换查看每个批次的准确到期时间。旧的 `CODEX_WATCH_RESET_CARD_EXPIRES_AT` 仍可作为单卡回退配置。
+
+这些值只应保存在被 Git 忽略的 `config.local.ps1`。服务不会从账号页面或浏览器中抓取数据；留空时手表显示 `NOT SET`。
 
 启动 Windows 用量服务：
 

@@ -23,8 +23,11 @@ $env:CODEX_WATCH_PUBLIC_URL = ""
 # Example: http://YOUR_PC_IP:8765/usage
 $env:CODEX_WATCH_LAN_URL = ""
 
-# Optional banked usage-reset card expiry. Use local time in YYYY-MM-DD or ISO 8601 format.
-# The server cannot infer this safely from current local Codex logs.
+# Optional banked usage-reset cards. Group cards with the same expiry using count.
+# Use YYYY-MM-DD or ISO 8601 timestamps. Keep the JSON on one line in PowerShell.
+$env:CODEX_WATCH_RESET_CARDS_JSON = '[]'
+
+# Legacy single-card setting. Used only when CODEX_WATCH_RESET_CARDS_JSON is empty.
 $env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
 
 # Optional Cloudflare named tunnel token.

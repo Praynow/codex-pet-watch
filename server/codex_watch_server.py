@@ -145,13 +145,16 @@ def parse_expiry(value: Any) -> datetime | None:
         return None
 
 
-def make_reset_card(expires_at: Any) -> dict[str, Any]:
+def make_reset_card(expires_at: Any, count: int = 1) -> dict[str, Any]:
     expiry = parse_expiry(expires_at)
     if expiry is None:
         return {
             "available": False,
+            "count": 0,
             "expires_at": "unknown",
             "expires_label": "--",
+            "expires_date_label": "--",
+            "expires_time_label": "--",
             "expires_in": "unknown",
             "days_remaining": None,
             "expired": False,
@@ -163,12 +166,76 @@ def make_reset_card(expires_at: Any) -> dict[str, Any]:
     days_remaining = 0 if expired else max(1, math.ceil(seconds / 86400))
     return {
         "available": True,
+        "count": count,
         "expires_at": expiry.isoformat(timespec="seconds"),
-        "expires_label": expiry.strftime("%m-%d"),
+        "expires_label": expiry.strftime("%m-%d %H:%M"),
+        "expires_date_label": expiry.strftime("%m-%d"),
+        "expires_time_label": expiry.strftime("%H:%M"),
         "expires_in": "expired" if expired else f"{days_remaining}d",
         "days_remaining": days_remaining,
         "expired": expired,
         "urgent": expired or days_remaining <= 7,
+    }
+
+
+def make_reset_cards(cards_json: Any, legacy_expires_at: Any = "") -> dict[str, Any]:
+    raw_entries: list[Any] = []
+    invalid_entries = 0
+    text = str(cards_json or "").strip()
+    if text:
+        try:
+            decoded = json.loads(text)
+            if isinstance(decoded, list):
+                raw_entries = decoded
+            else:
+                invalid_entries += 1
+        except (TypeError, ValueError, json.JSONDecodeError):
+            invalid_entries += 1
+
+    if not raw_entries and legacy_expires_at:
+        raw_entries = [{"expires_at": legacy_expires_at, "count": 1}]
+
+    grouped: dict[str, dict[str, Any]] = {}
+    for entry in raw_entries:
+        if not isinstance(entry, dict):
+            invalid_entries += 1
+            continue
+        expires_at = entry.get("expires_at")
+        try:
+            count = int(entry.get("count", 1))
+        except (TypeError, ValueError):
+            invalid_entries += 1
+            continue
+        if count <= 0 or count > 999:
+            invalid_entries += 1
+            continue
+        card = make_reset_card(expires_at, count)
+        if not card["available"]:
+            invalid_entries += 1
+            continue
+        key = card["expires_at"]
+        if key in grouped:
+            grouped[key]["count"] += count
+        else:
+            grouped[key] = card
+
+    cards = sorted(grouped.values(), key=lambda item: item["expires_at"])
+    usable_cards = [card for card in cards if not card["expired"]]
+    next_expiry = usable_cards[0] if usable_cards else (cards[0] if cards else None)
+    total_count = sum(card["count"] for card in cards)
+    usable_count = sum(card["count"] for card in usable_cards)
+    expired_count = total_count - usable_count
+    urgent_count = sum(card["count"] for card in usable_cards if card["urgent"])
+    return {
+        "available": bool(cards),
+        "total_count": total_count,
+        "usable_count": usable_count,
+        "urgent_count": urgent_count,
+        "expired_count": expired_count,
+        "invalid_entries": invalid_entries,
+        "urgent": urgent_count > 0 or expired_count > 0,
+        "next_expiry": next_expiry,
+        "cards": cards,
     }
 
 
@@ -185,6 +252,7 @@ def make_payload(
     forced_status: str | None,
     max_age_seconds: int = DEFAULT_SYNC_MAX_AGE_SECONDS,
     reset_card_expires_at: str = "",
+    reset_cards_json: str = "",
 ) -> dict[str, Any]:
     snap = reader.read()
     session = make_limit(snap.session)
@@ -201,6 +269,8 @@ def make_payload(
     today_total = token_total(snap.today)
     last_7_total = token_total(snap.last_7_days)
     last_30_total = token_total(snap.last_30_days)
+    reset_cards = make_reset_cards(reset_cards_json, reset_card_expires_at)
+    reset_card = reset_cards["next_expiry"] or make_reset_card("")
 
     return {
         "app": "codex-watch",
@@ -231,7 +301,8 @@ def make_payload(
             "quota_seen_at": getattr(snap, "quota_seen_at", "unknown"),
             "watch_refresh_seconds": max_age_seconds,
         },
-        "reset_card": make_reset_card(reset_card_expires_at),
+        "reset_card": reset_card,
+        "reset_cards": reset_cards,
         "pet": {
             "id": "yukino",
             "state": pet_state_for_status(status),
@@ -277,6 +348,7 @@ class CodexWatchHandler(BaseHTTPRequestHandler):
                     self.server.forced_status,
                     self.server.max_age_seconds,
                     self.server.reset_card_expires_at,
+                    self.server.reset_cards_json,
                 )
                 self.write_json(payload)
             except Exception as exc:
@@ -315,6 +387,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-dir", default=os.environ.get("CODEX_WATCH_CODEX_DIR", ""))
     parser.add_argument("--codexbar-path", default=os.environ.get("CODEXBAR_SAFE_PATH", ""))
     parser.add_argument("--reset-card-expires-at", default=os.environ.get("CODEX_WATCH_RESET_CARD_EXPIRES_AT", ""))
+    parser.add_argument("--reset-cards-json", default=os.environ.get("CODEX_WATCH_RESET_CARDS_JSON", ""))
     parser.add_argument("--force-status", choices=["ready", "working", "caution", "low"], default=os.environ.get("CODEX_WATCH_FORCE_STATUS"))
     parser.add_argument("--max-age-seconds", type=int, default=int(os.environ.get("CODEX_WATCH_MAX_AGE_SECONDS", DEFAULT_SYNC_MAX_AGE_SECONDS)))
     parser.add_argument("--once", action="store_true", help="Print one /usage payload and exit.")
@@ -333,7 +406,13 @@ def main() -> None:
     if args.once:
         print(
             json.dumps(
-                make_payload(reader, args.force_status, args.max_age_seconds, args.reset_card_expires_at),
+                make_payload(
+                    reader,
+                    args.force_status,
+                    args.max_age_seconds,
+                    args.reset_card_expires_at,
+                    args.reset_cards_json,
+                ),
                 ensure_ascii=False,
                 indent=2,
             )
@@ -346,6 +425,7 @@ def main() -> None:
     httpd.forced_status = args.force_status
     httpd.max_age_seconds = args.max_age_seconds
     httpd.reset_card_expires_at = args.reset_card_expires_at
+    httpd.reset_cards_json = args.reset_cards_json
     httpd.quiet = args.quiet
 
     print(f"{APP_NAME} listening on http://{args.host}:{args.port}/usage")

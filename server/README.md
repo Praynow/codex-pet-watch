@@ -33,10 +33,19 @@ $env:CODEX_WATCH_CODEX_DIR = "C:\path\to\.codex"
 ```powershell
 $env:CODEX_WATCH_PORT = "8765"
 $env:CODEX_WATCH_TOKEN = ""
+$env:CODEX_WATCH_RESET_CARDS_JSON = '[]'
 $env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
 ```
 
-`CODEX_WATCH_RESET_CARD_EXPIRES_AT` 可填写 Codex 控制台显示的用量重置卡到期日，格式为 `YYYY-MM-DD` 或 ISO 8601。日志目前不包含可靠的重置卡授予/到期字段，因此服务不会猜测，也不会访问浏览器或账号页面；留空时 API 返回 `reset_card.available=false`。
+`CODEX_WATCH_RESET_CARDS_JSON` 用于记录多张卡，可按到期时间分组，例如：
+
+```powershell
+$env:CODEX_WATCH_RESET_CARDS_JSON = '[{"expires_at":"2030-01-15T09:00:00+08:00","count":2},{"expires_at":"2030-02-01","count":1}]'
+```
+
+API 的 `reset_cards` 字段会返回 `total_count`、`usable_count`、`urgent_count`、`expired_count`、最近到期批次和完整批次数组。`reset_card` 保留为最近到期批次，兼容旧手表版本。`CODEX_WATCH_RESET_CARD_EXPIRES_AT` 仅在多卡列表为空时作为单卡回退。
+
+本地日志目前不包含可靠的重置卡授予/到期字段，因此服务不会猜测，也不会访问浏览器或账号页面；未配置时 API 返回 `reset_cards.available=false`。
 
 如果仍想使用外部 CodexBar Safe 项目的读取器，可设置：
 
