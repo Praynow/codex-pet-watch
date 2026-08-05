@@ -27,7 +27,18 @@ if (-not $cloudflaredExe) {
 
 $token = if ($CloudflareTunnelToken) { $CloudflareTunnelToken } else { $env:CLOUDFLARED_TUNNEL_TOKEN }
 if ($token) {
-    & $cloudflaredExe tunnel --no-autoupdate run --token $token
+    $hadTunnelToken = Test-Path Env:TUNNEL_TOKEN
+    $previousTunnelToken = $env:TUNNEL_TOKEN
+    $env:TUNNEL_TOKEN = $token
+    try {
+        & $cloudflaredExe tunnel --no-autoupdate run
+    } finally {
+        if ($hadTunnelToken) {
+            $env:TUNNEL_TOKEN = $previousTunnelToken
+        } else {
+            Remove-Item Env:TUNNEL_TOKEN -ErrorAction SilentlyContinue
+        }
+    }
 } else {
     Write-Host "Starting a temporary Quick Tunnel. Its URL changes whenever the tunnel restarts." -ForegroundColor Yellow
     & $cloudflaredExe tunnel --url http://127.0.0.1:8765

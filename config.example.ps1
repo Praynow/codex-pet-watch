@@ -23,5 +23,9 @@ $env:CODEX_WATCH_PUBLIC_URL = ""
 # Example: http://YOUR_PC_IP:8765/usage
 $env:CODEX_WATCH_LAN_URL = ""
 
+# Optional banked usage-reset card expiry. Use local time in YYYY-MM-DD or ISO 8601 format.
+# The server cannot infer this safely from current local Codex logs.
+$env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
+
 # Optional Cloudflare named tunnel token.
 $env:CLOUDFLARED_TUNNEL_TOKEN = ""

@@ -68,6 +68,7 @@ class UsageSnapshot:
     updated: str = "Never"
     source: str = "none"
     model: str = "unknown"
+    effort: str = "unknown"
     plan: str = "unknown"
     session: LimitWindow = field(default_factory=lambda: LimitWindow("Session"))
     weekly: LimitWindow = field(default_factory=lambda: LimitWindow("Weekly"))
@@ -119,6 +120,9 @@ class CodexUsageReader:
             return snap
 
         snap.latest_session = str(files[0])
+        latest_model = None
+        latest_effort = None
+        latest_model_seen = None
         latest_limits = None
         latest_plan = None
         latest_seen = None
@@ -126,6 +130,11 @@ class CodexUsageReader:
         saw_rate_limit_events = False
 
         for path in files:
+            model, effort, model_seen = self._extract_latest_model_context(path)
+            if model_seen and (latest_model_seen is None or model_seen > latest_model_seen):
+                latest_model = model
+                latest_effort = effort
+                latest_model_seen = model_seen
             limits, plan, seen_at, saw_events, rate_seen_at = self._extract_latest_limits(path)
             saw_rate_limit_events = saw_rate_limit_events or saw_events
             latest_rate_seen = _max_datetime(latest_rate_seen, rate_seen_at)
@@ -135,6 +144,10 @@ class CodexUsageReader:
                 latest_seen = seen_at
 
         snap.latest_rate_limit_seen_at = _format_seen_at(latest_rate_seen)
+        if latest_model:
+            snap.model = latest_model
+        if latest_effort:
+            snap.effort = latest_effort
 
         if latest_limits:
             snap.source = "sessions"
@@ -176,6 +189,34 @@ class CodexUsageReader:
         except OSError:
             pass
         return "unknown"
+
+    @staticmethod
+    def _extract_latest_model_context(path: Path) -> tuple[str | None, str | None, datetime | None]:
+        last_model = None
+        last_effort = None
+        last_seen = None
+        try:
+            with path.open("r", encoding="utf-8", errors="ignore") as handle:
+                for line in handle:
+                    if '"model"' not in line and '"effort"' not in line:
+                        continue
+                    event = _json_line(line)
+                    payload = event.get("payload", {}) if isinstance(event, dict) else {}
+                    if not isinstance(payload, dict):
+                        continue
+                    model = str(payload.get("model") or "").strip()
+                    effort = str(payload.get("effort") or payload.get("reasoning_effort") or "").strip()
+                    if not model and not effort:
+                        continue
+                    seen_at = _parse_timestamp(event.get("timestamp"))
+                    if model:
+                        last_model = model
+                    if effort:
+                        last_effort = effort
+                    last_seen = seen_at or last_seen
+        except OSError:
+            return None, None, None
+        return last_model, last_effort, last_seen
 
     @staticmethod
     def _extract_latest_limits(path: Path) -> tuple[dict | None, str | None, datetime | None, bool, datetime | None]:

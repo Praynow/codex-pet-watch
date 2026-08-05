@@ -12,15 +12,59 @@ $errPath = Join-Path $projectDir "codex-watch-server.err.log"
 $tokenPath = Join-Path $projectDir "codex-watch-token.txt"
 $port = if ($env:CODEX_WATCH_PORT) { $env:CODEX_WATCH_PORT } else { "8765" }
 
+function Get-CodexWatchServerProcess {
+    param(
+        [int]$ProcessId
+    )
+
+    if ($ProcessId -le 0) {
+        return $null
+    }
+
+    $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
+    if (-not $processInfo) {
+        return $null
+    }
+
+    $processName = [string]$processInfo.Name
+    $commandLine = [string]$processInfo.CommandLine
+    if ($processName -notin @("python.exe", "python3.exe", "py.exe")) {
+        return $null
+    }
+    if ($commandLine -notmatch "codex_watch_server\.py") {
+        return $null
+    }
+
+    return $processInfo
+}
+
 if (Test-Path $pidPath) {
-    $existingPid = (Get-Content $pidPath -Raw).Trim()
-    if ($existingPid) {
-        $existingProcess = Get-Process -Id ([int]$existingPid) -ErrorAction SilentlyContinue
+    $existingPidText = (Get-Content $pidPath -Raw).Trim()
+    $existingPid = 0
+    if ($existingPidText -and [int]::TryParse($existingPidText, [ref]$existingPid)) {
+        $existingProcess = Get-CodexWatchServerProcess -ProcessId $existingPid
         if ($existingProcess) {
             Write-Host "Codex Watch server is already running. PID: $existingPid" -ForegroundColor Green
             exit 0
         }
     }
+
+    Write-Host "Removing stale server PID file." -ForegroundColor Yellow
+    Remove-Item -LiteralPath $pidPath -Force -ErrorAction SilentlyContinue
+}
+
+$listener = Get-NetTCPConnection -LocalPort ([int]$port) -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($listener) {
+    $listenerProcess = Get-CodexWatchServerProcess -ProcessId ([int]$listener.OwningProcess)
+    if ($listenerProcess) {
+        Set-Content -Path $pidPath -Value $listener.OwningProcess
+        Write-Host "Codex Watch server is already listening. PID: $($listener.OwningProcess)" -ForegroundColor Green
+        exit 0
+    }
+
+    $owner = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+    $ownerName = if ($owner) { $owner.ProcessName } else { "unknown" }
+    throw "Port $port is already in use by PID $($listener.OwningProcess) ($ownerName)."
 }
 
 $token = $env:CODEX_WATCH_TOKEN
@@ -39,13 +83,40 @@ if (-not $token) {
     Set-Content -Path $tokenPath -Value $token
 }
 
-$arguments = @(".\server\codex_watch_server.py", "--host", "0.0.0.0", "--port", $port, "--token", $token)
-$process = Start-Process -FilePath "python" -ArgumentList $arguments -WorkingDirectory $projectDir -RedirectStandardOutput $outPath -RedirectStandardError $errPath -WindowStyle Hidden -PassThru
+$arguments = @(".\server\codex_watch_server.py", "--host", "0.0.0.0", "--port", $port)
+$hadTokenEnvironment = Test-Path Env:CODEX_WATCH_TOKEN
+$previousTokenEnvironment = $env:CODEX_WATCH_TOKEN
+$env:CODEX_WATCH_TOKEN = $token
+try {
+    $process = Start-Process -FilePath "python" -ArgumentList $arguments -WorkingDirectory $projectDir -RedirectStandardOutput $outPath -RedirectStandardError $errPath -WindowStyle Hidden -PassThru
+} finally {
+    if ($hadTokenEnvironment) {
+        $env:CODEX_WATCH_TOKEN = $previousTokenEnvironment
+    } else {
+        Remove-Item Env:CODEX_WATCH_TOKEN -ErrorAction SilentlyContinue
+    }
+}
 Set-Content -Path $pidPath -Value $process.Id
 
 Start-Sleep -Seconds 2
 if (-not (Get-Process -Id $process.Id -ErrorAction SilentlyContinue)) {
     throw "Codex Watch server exited immediately. Check $errPath"
+}
+
+$deadline = (Get-Date).AddSeconds(8)
+$serverListener = $null
+do {
+    $serverListener = Get-NetTCPConnection -LocalPort ([int]$port) -State Listen -ErrorAction SilentlyContinue |
+        Where-Object { $_.OwningProcess -eq $process.Id } |
+        Select-Object -First 1
+    if ($serverListener) {
+        break
+    }
+    Start-Sleep -Milliseconds 500
+} while ((Get-Date) -lt $deadline)
+
+if (-not $serverListener) {
+    throw "Codex Watch server started but did not listen on port $port. Check $errPath"
 }
 
 Write-Host "Codex Watch server is running. PID: $($process.Id)" -ForegroundColor Green

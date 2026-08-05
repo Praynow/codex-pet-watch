@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import os
 import sys
 from dataclasses import asdict
@@ -11,7 +12,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from codex_usage_reader import CodexUsageReader
 
@@ -129,6 +130,48 @@ def compact_age(seconds: int | None) -> str:
     return f"{hours // 24}d"
 
 
+def parse_expiry(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        if len(text) == 10:
+            return datetime.strptime(text, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone()
+        return parsed.replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def make_reset_card(expires_at: Any) -> dict[str, Any]:
+    expiry = parse_expiry(expires_at)
+    if expiry is None:
+        return {
+            "available": False,
+            "expires_at": "unknown",
+            "expires_label": "--",
+            "expires_in": "unknown",
+            "days_remaining": None,
+            "expired": False,
+            "urgent": False,
+        }
+
+    seconds = int((expiry - datetime.now()).total_seconds())
+    expired = seconds <= 0
+    days_remaining = 0 if expired else max(1, math.ceil(seconds / 86400))
+    return {
+        "available": True,
+        "expires_at": expiry.isoformat(timespec="seconds"),
+        "expires_label": expiry.strftime("%m-%d"),
+        "expires_in": "expired" if expired else f"{days_remaining}d",
+        "days_remaining": days_remaining,
+        "expired": expired,
+        "urgent": expired or days_remaining <= 7,
+    }
+
+
 def quota_freshness(snap: Any, max_age_seconds: int) -> tuple[int | None, str, bool]:
     seen_at = parse_seen_at(getattr(snap, "quota_seen_at", "unknown"))
     if seen_at is None:
@@ -137,7 +180,12 @@ def quota_freshness(snap: Any, max_age_seconds: int) -> tuple[int | None, str, b
     return age_seconds, compact_age(age_seconds), age_seconds <= max_age_seconds
 
 
-def make_payload(reader: Any, effort: str, forced_status: str | None, max_age_seconds: int = DEFAULT_SYNC_MAX_AGE_SECONDS) -> dict[str, Any]:
+def make_payload(
+    reader: Any,
+    forced_status: str | None,
+    max_age_seconds: int = DEFAULT_SYNC_MAX_AGE_SECONDS,
+    reset_card_expires_at: str = "",
+) -> dict[str, Any]:
     snap = reader.read()
     session = make_limit(snap.session)
     weekly = make_limit(snap.weekly)
@@ -163,7 +211,7 @@ def make_payload(reader: Any, effort: str, forced_status: str | None, max_age_se
         "available": bool(snap.available),
         "model": snap.model,
         "plan": snap.plan,
-        "effort": effort,
+        "effort": snap.effort,
         "status": status,
         "session": session,
         "weekly": weekly,
@@ -183,6 +231,7 @@ def make_payload(reader: Any, effort: str, forced_status: str | None, max_age_se
             "quota_seen_at": getattr(snap, "quota_seen_at", "unknown"),
             "watch_refresh_seconds": max_age_seconds,
         },
+        "reset_card": make_reset_card(reset_card_expires_at),
         "pet": {
             "id": "yukino",
             "state": pet_state_for_status(status),
@@ -193,8 +242,8 @@ def make_payload(reader: Any, effort: str, forced_status: str | None, max_age_se
         "diagnostics": {
             "session_files": snap.session_files,
             "scanned_files": snap.scanned_files,
-            "latest_session": snap.latest_session,
-            "error": snap.error,
+            "latest_session": Path(str(snap.latest_session)).name,
+            "error": "usage reader error" if snap.error else None,
         },
     }
 
@@ -225,13 +274,14 @@ class CodexWatchHandler(BaseHTTPRequestHandler):
             try:
                 payload = make_payload(
                     self.server.reader,
-                    self.server.effort,
                     self.server.forced_status,
                     self.server.max_age_seconds,
+                    self.server.reset_card_expires_at,
                 )
                 self.write_json(payload)
             except Exception as exc:
-                self.write_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                print(f"usage generation failed: {type(exc).__name__}", file=sys.stderr)
+                self.write_json({"error": "usage unavailable"}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
         self.write_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
@@ -241,8 +291,7 @@ class CodexWatchHandler(BaseHTTPRequestHandler):
         if not expected:
             return True
         provided = self.headers.get("X-Codex-Watch-Token", "")
-        query_token = parse_qs(parsed.query).get("token", [""])[0]
-        return provided == expected or query_token == expected
+        return provided == expected
 
     def send_common_headers(self, content_type: str) -> None:
         self.send_header("Content-Type", content_type)
@@ -265,8 +314,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=int(os.environ.get("CODEX_WATCH_PORT", DEFAULT_PORT)))
     parser.add_argument("--codex-dir", default=os.environ.get("CODEX_WATCH_CODEX_DIR", ""))
     parser.add_argument("--codexbar-path", default=os.environ.get("CODEXBAR_SAFE_PATH", ""))
-    parser.add_argument("--token", default=os.environ.get("CODEX_WATCH_TOKEN", ""))
-    parser.add_argument("--effort", default=os.environ.get("CODEX_WATCH_EFFORT", "XHIGH"))
+    parser.add_argument("--reset-card-expires-at", default=os.environ.get("CODEX_WATCH_RESET_CARD_EXPIRES_AT", ""))
     parser.add_argument("--force-status", choices=["ready", "working", "caution", "low"], default=os.environ.get("CODEX_WATCH_FORCE_STATUS"))
     parser.add_argument("--max-age-seconds", type=int, default=int(os.environ.get("CODEX_WATCH_MAX_AGE_SECONDS", DEFAULT_SYNC_MAX_AGE_SECONDS)))
     parser.add_argument("--once", action="store_true", help="Print one /usage payload and exit.")
@@ -283,19 +331,25 @@ def main() -> None:
         reader = CodexUsageReader(args.codex_dir or None)
 
     if args.once:
-        print(json.dumps(make_payload(reader, args.effort, args.force_status, args.max_age_seconds), ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                make_payload(reader, args.force_status, args.max_age_seconds, args.reset_card_expires_at),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return
 
     httpd = ThreadingHTTPServer((args.host, args.port), CodexWatchHandler)
     httpd.reader = reader
-    httpd.token = args.token
-    httpd.effort = args.effort
+    httpd.token = os.environ.get("CODEX_WATCH_TOKEN", "")
     httpd.forced_status = args.force_status
     httpd.max_age_seconds = args.max_age_seconds
+    httpd.reset_card_expires_at = args.reset_card_expires_at
     httpd.quiet = args.quiet
 
     print(f"{APP_NAME} listening on http://{args.host}:{args.port}/usage")
-    if args.token:
+    if httpd.token:
         print("Token protection enabled.")
     httpd.serve_forever()
 

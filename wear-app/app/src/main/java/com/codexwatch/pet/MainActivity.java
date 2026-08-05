@@ -225,9 +225,11 @@ public class MainActivity extends Activity {
         int weeklyLeft = 98;
         String today = "403K";
         String sevenDays = "2.5M";
-        String model = "gpt-5.5";
-        String effort = "XHIGH";
+        String model = "--";
         String resetLabel = "RESET 1h52m";
+        String resetCardLabel = "--";
+        String resetCardDetail = "NOT SET";
+        boolean resetCardUrgent = false;
         String petState = "idle";
         boolean online = true;
         boolean stale = false;
@@ -245,8 +247,9 @@ public class MainActivity extends Activity {
             data.today = "--";
             data.sevenDays = "--";
             data.model = "--";
-            data.effort = "--";
             data.resetLabel = "OFFLINE";
+            data.resetCardLabel = "--";
+            data.resetCardDetail = "OFFLINE";
             data.petState = "failed";
             data.online = false;
             data.hasRealData = false;
@@ -261,8 +264,10 @@ public class MainActivity extends Activity {
             data.today = today;
             data.sevenDays = sevenDays;
             data.model = model;
-            data.effort = effort;
             data.resetLabel = resetLabel;
+            data.resetCardLabel = resetCardLabel;
+            data.resetCardDetail = resetCardDetail;
+            data.resetCardUrgent = resetCardUrgent;
             data.petState = petState;
             data.online = online;
             data.stale = stale;
@@ -277,6 +282,7 @@ public class MainActivity extends Activity {
             JSONObject tokens = root.optJSONObject("tokens");
             JSONObject pet = root.optJSONObject("pet");
             JSONObject sync = root.optJSONObject("sync");
+            JSONObject resetCard = root.optJSONObject("reset_card");
             boolean syncFresh = sync == null || sync.optBoolean("fresh", true);
             String syncAge = sync == null ? "unknown" : sync.optString("source_age_label", "unknown");
             data.hasRealData = root.optBoolean("available", true);
@@ -297,7 +303,15 @@ public class MainActivity extends Activity {
                 data.sevenDays = tokens.optString("last_7_days_label", data.sevenDays);
             }
             data.model = root.optString("model", data.model);
-            data.effort = root.optString("effort", data.effort).toUpperCase(Locale.US);
+            if (resetCard != null && resetCard.optBoolean("available", false)) {
+                String expires = resetCard.optString("expires_label", "--");
+                String remaining = resetCard.optString("expires_in", "unknown");
+                data.resetCardLabel = expires;
+                data.resetCardDetail = "expired".equalsIgnoreCase(remaining)
+                        ? "EXPIRED"
+                        : expires + " " + remaining.toUpperCase(Locale.US);
+                data.resetCardUrgent = resetCard.optBoolean("urgent", false);
+            }
             if (pet != null) {
                 data.petState = pet.optString("state", data.petState);
             }
@@ -337,21 +351,14 @@ public class MainActivity extends Activity {
     private static final class UserSettings {
         private static final String PREFS = "codex_watch_settings";
         private static final String KEY_PET = "pet";
-        private static final String KEY_MODEL = "model";
-        private static final String KEY_EFFORT = "effort";
-        private static final String[] MODEL_OPTIONS = {"AUTO", "GPT-5.5", "GPT-5", "GPT-4.1", "O4-MINI"};
-        private static final String[] EFFORT_OPTIONS = {"AUTO", "LOW", "MED", "HIGH", "XHIGH"};
 
         int petIndex;
-        int modelIndex;
-        int effortIndex;
 
         static UserSettings load(Context context) {
             SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             UserSettings settings = new UserSettings();
             settings.petIndex = prefs.contains(KEY_PET) ? Math.max(0, prefs.getInt(KEY_PET, 0)) : -1;
-            settings.modelIndex = clampIndex(prefs.getInt(KEY_MODEL, 0), MODEL_OPTIONS.length);
-            settings.effortIndex = clampIndex(prefs.getInt(KEY_EFFORT, 0), EFFORT_OPTIONS.length);
+            prefs.edit().remove("model").remove("effort").apply();
             return settings;
         }
 
@@ -359,8 +366,6 @@ public class MainActivity extends Activity {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putInt(KEY_PET, petIndex)
-                    .putInt(KEY_MODEL, modelIndex)
-                    .putInt(KEY_EFFORT, effortIndex)
                     .apply();
         }
 
@@ -372,30 +377,6 @@ public class MainActivity extends Activity {
             petIndex = (petIndex + 1) % Math.max(1, size);
         }
 
-        void nextModel() {
-            modelIndex = (modelIndex + 1) % MODEL_OPTIONS.length;
-        }
-
-        void nextEffort() {
-            effortIndex = (effortIndex + 1) % EFFORT_OPTIONS.length;
-        }
-
-        String modelLabel() {
-            return MODEL_OPTIONS[modelIndex];
-        }
-
-        String effortLabel() {
-            return EFFORT_OPTIONS[effortIndex];
-        }
-
-        String modelFor(UsageData usage) {
-            return modelIndex == 0 ? usage.model : MODEL_OPTIONS[modelIndex];
-        }
-
-        String effortFor(UsageData usage) {
-            return effortIndex == 0 ? usage.effort : EFFORT_OPTIONS[effortIndex];
-        }
-
         private static int clampIndex(int value, int size) {
             return Math.max(0, Math.min(size - 1, value));
         }
@@ -405,11 +386,13 @@ public class MainActivity extends Activity {
         final String id;
         final String displayName;
         final String spritesheetPath;
+        final int spriteVersionNumber;
 
-        PetOption(String id, String displayName, String spritesheetPath) {
+        PetOption(String id, String displayName, String spritesheetPath, int spriteVersionNumber) {
             this.id = id;
             this.displayName = displayName;
             this.spritesheetPath = spritesheetPath;
+            this.spriteVersionNumber = spriteVersionNumber;
         }
     }
 
@@ -422,6 +405,7 @@ public class MainActivity extends Activity {
 
         static PetCatalog load(Context context) {
             List<PetOption> loaded = new ArrayList<>();
+            loaded.add(new PetOption("builtin", "Built-in", "", 1));
             AssetManager assets = context.getAssets();
             try {
                 String[] ids = assets.list("pets");
@@ -435,10 +419,7 @@ public class MainActivity extends Activity {
                     }
                 }
             } catch (Exception ignored) {
-                loaded.clear();
-            }
-            if (loaded.isEmpty()) {
-                loaded.add(new PetOption("builtin", "Built-in", ""));
+                loaded.subList(1, loaded.size()).clear();
             }
             return new PetCatalog(loaded);
         }
@@ -464,15 +445,17 @@ public class MainActivity extends Activity {
         private static PetOption loadPet(AssetManager assets, String id) {
             String displayName = readableName(id);
             String spritesheetPath = "spritesheet.webp";
+            int spriteVersionNumber = 1;
             try (InputStream stream = assets.open("pets/" + id + "/pet.json")) {
                 JSONObject json = new JSONObject(readAssetText(stream));
                 displayName = cleanLabel(json.optString("displayName", displayName), displayName);
                 spritesheetPath = json.optString("spritesheetPath", spritesheetPath);
+                spriteVersionNumber = Math.max(1, json.optInt("spriteVersionNumber", 1));
             } catch (Exception ignored) {
                 displayName = readableName(id);
             }
             try (InputStream ignored = assets.open("pets/" + id + "/" + spritesheetPath)) {
-                return new PetOption(id, displayName, spritesheetPath);
+                return new PetOption(id, displayName, spritesheetPath, spriteVersionNumber);
             } catch (Exception ignored) {
                 return null;
             }
@@ -522,9 +505,9 @@ public class MainActivity extends Activity {
         private static final int PAGE_SETTINGS = 2;
         private static final int PAGE_COUNT = 3;
         private static final float SWIPE_THRESHOLD = 46f;
-        private static final String[] PLAY_ACTIONS = {"IDLE", "RUN", "WAVE", "SIT", "REST", "SMILE", "SHY", "THINK"};
-        private static final int[] PLAY_ROWS = {0, 1, 3, 4, 5, 6, 7, 8};
-        private static final int[] PLAY_FRAMES = {6, 8, 4, 5, 8, 6, 6, 6};
+        private static final String[] PLAY_ACTIONS = {"IDLE", "RUN RIGHT", "RUN LEFT", "WAVE", "JUMP", "FAILED", "WAITING", "WORKING", "REVIEW"};
+        private static final int[] PLAY_ROWS = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+        private static final int[] PLAY_FRAMES = {6, 8, 8, 4, 5, 8, 6, 6, 6};
         private static final int COL_BG = Color.rgb(3, 6, 7);
         private static final int COL_PANEL = Color.rgb(7, 16, 20);
         private static final int COL_TEXT = Color.rgb(237, 248, 255);
@@ -671,8 +654,8 @@ public class MainActivity extends Activity {
             drawTitle(canvas, "Settings");
             drawPetFrame(canvas, 3, 4, 154, 49, 238, 140);
             drawSettingRow(canvas, 154, "PET", catalog.selected(settings).displayName, COL_GREEN);
-            drawSettingRow(canvas, 210, "MODEL", settings.modelLabel(), COL_BLUE);
-            drawSettingRow(canvas, 266, "EFFORT", settings.effortLabel(), COL_RED);
+            drawSettingRow(canvas, 210, "MODEL (AUTO)", usage.model, COL_BLUE);
+            drawSettingRow(canvas, 266, "RESET CARD", usage.resetCardDetail, usage.resetCardUrgent ? COL_RED : COL_GREEN);
         }
 
         private void drawTitle(Canvas canvas, String title) {
@@ -730,13 +713,14 @@ public class MainActivity extends Activity {
             paint.setTextSize(10);
             paint.setColor(COL_MUTED);
             canvas.drawText("MODEL", 54, 149, paint);
-            canvas.drawText("EFFORT", 298, 149, paint);
+            canvas.drawText("RESET CARD", 274, 149, paint);
 
             paint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
             paint.setTextSize(12);
             paint.setColor(Color.rgb(191, 231, 255));
-            canvas.drawText(fit(settings.modelFor(usage), 10), 54, 166, paint);
-            canvas.drawText(fit(settings.effortFor(usage), 7), 291, 166, paint);
+            canvas.drawText(fit(usage.model, 12), 54, 166, paint);
+            paint.setColor(usage.resetCardUrgent ? COL_RED : Color.rgb(191, 231, 255));
+            canvas.drawText(fit(usage.resetCardLabel, 8), 291, 166, paint);
         }
 
         private void drawPet(Canvas canvas) {
@@ -839,9 +823,9 @@ public class MainActivity extends Activity {
             float height = bottom - top;
             float cx = (left + right) / 2f;
             float tick = SystemClock.uptimeMillis() / 260f;
-            float bob = row == 1 ? (float) Math.sin(tick) * height * 0.04f : (float) Math.sin(tick) * height * 0.015f;
+            float bob = row == 1 || row == 2 ? (float) Math.sin(tick) * height * 0.04f : (float) Math.sin(tick) * height * 0.015f;
             float y = top + bob;
-            int accent = row == 5 ? COL_RED : row == 8 ? COL_BLUE : row == 1 ? COL_GREEN : Color.rgb(191, 231, 255);
+            int accent = row == 5 ? COL_RED : row == 8 ? COL_BLUE : row == 7 ? COL_GREEN : Color.rgb(191, 231, 255);
 
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.argb(46, 90, 226, 154));
@@ -918,7 +902,10 @@ public class MainActivity extends Activity {
 
         private int petRow(String state) {
             if ("running".equals(state)) {
-                return 1;
+                return 7;
+            }
+            if ("waiting".equals(state)) {
+                return 6;
             }
             if ("review".equals(state)) {
                 return 8;
@@ -931,7 +918,7 @@ public class MainActivity extends Activity {
 
         private int petFrames(String state) {
             if ("running".equals(state)) {
-                return 8;
+                return 6;
             }
             if ("failed".equals(state)) {
                 return 8;
@@ -962,10 +949,6 @@ public class MainActivity extends Activity {
             if (y >= 148 && y <= 202) {
                 settings.nextPet(catalog.size());
                 loadSprite();
-            } else if (y >= 204 && y <= 258) {
-                settings.nextModel();
-            } else if (y >= 260 && y <= 318) {
-                settings.nextEffort();
             } else {
                 changed = false;
             }

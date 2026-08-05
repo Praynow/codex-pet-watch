@@ -5,9 +5,10 @@
 ## 功能概览
 
 - Wear OS 圆形表盘界面，适配 OPPO Watch X2 等 Wear OS 手表。
-- 默认使用纯代码绘制的占位宠物，不包含第三方宠物图片素材。
-- 支持用户自行添加有授权的宠物 spritesheet。
-- Windows 本地服务读取 Codex CLI 用量日志。
+- 内置代码占位宠物，并打包本项目已确认用于手表的宠物 spritesheet。
+- 支持用户继续添加有授权的宠物 spritesheet；v2 动作表覆盖待机、移动、挥手、跳跃、失败、等待、工作和审查状态。
+- Windows 本地服务读取 Codex CLI 用量日志，并从最新会话自动识别实际模型；手表不再保存模型或 effort 选项。
+- 可配置 Codex 用量重置卡的到期时间，手表会显示剩余天数并在临近到期时提醒。
 - 支持 USB 调试、局域网地址和公网隧道三种同步方式。
 - 手表每 5 分钟自动刷新，也可以点击表盘立即刷新。
 - 用量样本超过 5 分钟未更新时显示 `STALE`，避免误看旧数据。
@@ -80,6 +81,14 @@ notepad .\config.local.ps1
 ```powershell
 $env:CODEX_WATCH_CODEX_DIR = "C:\path\to\.codex"
 ```
+
+如果账户中有尚未使用的 Codex 用量重置卡，可把控制台显示的到期日期填入本地配置：
+
+```powershell
+$env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = "2026-08-31"
+```
+
+支持 `YYYY-MM-DD` 或 ISO 8601 时间。此值仅保存在 `config.local.ps1`，服务不会从账号页面或浏览器中抓取数据；留空时手表显示 `NOT SET`。
 
 启动 Windows 用量服务：
 
@@ -200,9 +209,9 @@ $env:CLOUDFLARED_TUNNEL_TOKEN = "YOUR_TUNNEL_TOKEN"
 
 也可以把 token 写入 `config.local.ps1`。没有 token 时，脚本会尝试启动临时 Quick Tunnel。
 
-## 自定义宠物素材
+## 宠物素材与动作
 
-仓库默认不包含任何宠物图片素材，以避免版权风险。应用会在没有素材时显示一个纯代码绘制的占位宠物。
+应用始终保留一个纯代码绘制的占位宠物，并会自动加载 `assets/pets/` 下的宠物包。当前仓库包含本项目已确认同步到手表的 `486`、`kabi`、`yukino` 和 `uniform-yukino`；四套资源均已通过尺寸、帧数、透明度和色键残留检查，其中两个 Yukino 包使用 v2 动作表。
 
 如果要添加自己的宠物素材，请创建：
 
@@ -224,9 +233,12 @@ spritesheet.webp
   "id": "my-pet",
   "displayName": "My Pet",
   "description": "A custom pet I own or have permission to distribute.",
+  "spriteVersionNumber": 2,
   "spritesheetPath": "spritesheet.webp"
 }
 ```
+
+v2 spritesheet 为 `8 × 11` 网格，每格 `192 × 208`。应用互动页可预览前 9 行：`IDLE`、`RUN RIGHT`、`RUN LEFT`、`WAVE`、`JUMP`、`FAILED`、`WAITING`、`WORKING`、`REVIEW`。
 
 请只提交你拥有版权、已获得授权、或明确可公开分发的素材。
 
@@ -243,6 +255,8 @@ spritesheet.webp
 - 本机 `tools/` 工具链缓存
 - 手动验证截图
 - 未确认授权的宠物图片素材
+
+API token 只通过 `X-Codex-Watch-Token` 请求头传递，不接受 URL 查询参数。诊断响应不会返回本机完整会话路径或读取器的原始错误；服务器和 Cloudflare 启动脚本也不会再把 token 放进进程命令行。
 
 公开前可以生成一个干净源码包：
 

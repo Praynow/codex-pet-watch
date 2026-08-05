@@ -45,4 +45,5 @@ foreach ($address in $addresses) {
     Write-Host "Watch URL candidate: http://$address`:$port/usage" -ForegroundColor Green
 }
 
-python .\server\codex_watch_server.py --host 0.0.0.0 --port $port --token $token
+$env:CODEX_WATCH_TOKEN = $token
+python .\server\codex_watch_server.py --host 0.0.0.0 --port $port

@@ -11,6 +11,8 @@ Windows 端用量桥接服务，提供给 Wear OS 手表应用读取。
 
 它不会读取浏览器数据、cookies、OpenAI auth token 或 Claude 文件，也不会启动 Codex 进程。
 
+服务会从最新的 Codex 会话事件中读取实际使用的模型和 effort。手表只显示实际模型，不提供需要随模型发布手动维护的选择列表；`config.toml` 中的模型只在会话尚无模型信息时作为回退。
+
 ## 配置
 
 复制根目录配置模板：
@@ -31,7 +33,10 @@ $env:CODEX_WATCH_CODEX_DIR = "C:\path\to\.codex"
 ```powershell
 $env:CODEX_WATCH_PORT = "8765"
 $env:CODEX_WATCH_TOKEN = ""
+$env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
 ```
+
+`CODEX_WATCH_RESET_CARD_EXPIRES_AT` 可填写 Codex 控制台显示的用量重置卡到期日，格式为 `YYYY-MM-DD` 或 ISO 8601。日志目前不包含可靠的重置卡授予/到期字段，因此服务不会猜测，也不会访问浏览器或账号页面；留空时 API 返回 `reset_card.available=false`。
 
 如果仍想使用外部 CodexBar Safe 项目的读取器，可设置：
 
@@ -39,7 +44,7 @@ $env:CODEX_WATCH_TOKEN = ""
 $env:CODEXBAR_SAFE_PATH = "C:\path\to\codexbar-win"
 ```
 
-token 留空时，启动脚本会自动生成根目录的 `codex-watch-token.txt`。这个文件不会进入 Git。
+token 留空时，启动脚本会自动生成根目录的 `codex-watch-token.txt`。这个文件不会进入 Git。认证只接受 `X-Codex-Watch-Token` 请求头，避免 token 出现在 URL、代理日志或浏览器历史中；启动脚本通过环境变量传递 token，不把它写进进程命令行。
 
 ## 运行
 

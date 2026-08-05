@@ -4,9 +4,10 @@
 
 ## 功能
 
-- 圆形手表界面，展示 Codex 5 小时额度、周额度和 token 用量。
-- 默认使用纯代码绘制的占位宠物，不包含第三方宠物图片素材。
-- 可自行添加有授权的宠物 spritesheet。
+- 圆形手表界面，展示 Codex 5 小时额度、周额度、token 用量和重置卡到期提醒。
+- 模型名称由服务从最新 Codex 会话自动识别；应用不再维护模型和 effort 选择列表。
+- 内置代码占位宠物，并自动加载项目中已确认用于手表的宠物 spritesheet。
+- 可继续添加有授权的宠物 spritesheet；互动页覆盖 9 个标准动作状态。
 - 用量、互动、设置三个页面。
 - 依次尝试多个服务地址。
 - 服务不可达时保留最后一次有效数据并显示离线状态。
@@ -61,9 +62,9 @@ APK 输出：
 wear-app\app\build\outputs\apk\debug\app-debug.apk
 ```
 
-## 自定义宠物素材
+## 宠物素材与动作
 
-默认仓库不带宠物图片素材。没有素材时，应用会显示内置的代码占位宠物。
+应用始终提供内置代码占位宠物，并自动加载 `assets/pets/` 中的宠物包。当前随应用打包 `486`、`kabi`、`yukino` 和 `uniform-yukino`；四套资源均已通过图集校验，后两个为 v2 动作表。
 
 要添加自己的宠物，请创建：
 
@@ -85,9 +86,12 @@ spritesheet.webp
   "id": "my-pet",
   "displayName": "My Pet",
   "description": "A custom pet I own or have permission to distribute.",
+  "spriteVersionNumber": 2,
   "spritesheetPath": "spritesheet.webp"
 }
 ```
+
+v2 spritesheet 为 `8 × 11` 网格，每格 `192 × 208`。互动页动作依次为 `IDLE`、`RUN RIGHT`、`RUN LEFT`、`WAVE`、`JUMP`、`FAILED`、`WAITING`、`WORKING`、`REVIEW`。
 
 请只使用你拥有版权、已获得授权、或明确可公开分发的素材。
 

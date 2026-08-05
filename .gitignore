@@ -34,6 +34,7 @@ watch-screen*.png
 watch-ui-preview*.png
 watch-ui-design*.md
 watch-ui-mockup*.html
+.pet-qa-*
 
 # OS/editor noise
 .DS_Store
