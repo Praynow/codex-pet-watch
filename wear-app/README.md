@@ -64,7 +64,7 @@ APK 输出：
 wear-app\app\build\outputs\apk\debug\app-debug.apk
 ```
 
-源码版本为 `versionCode 2`、`versionName 0.2.0`。debug APK 使用 Android debug 证书，仅用于覆盖已有 debug 安装。
+源码版本为 `versionCode 3`、`versionName 0.2.1`。debug APK 使用 Android debug 证书，仅用于覆盖已有 debug 安装。
 
 ## 固定 release 签名
 

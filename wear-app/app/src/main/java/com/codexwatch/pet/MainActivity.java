@@ -17,6 +17,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
@@ -140,6 +141,7 @@ public class MainActivity extends Activity {
     }
 
     private static final class UsageClient {
+        private static final String TAG = "CodexWatch";
         private static final String USB_ENDPOINT = "http://127.0.0.1:8765/usage";
         private final List<String> endpoints;
         private final String token;
@@ -187,8 +189,9 @@ public class MainActivity extends Activity {
                 URL url = new URL(urlText);
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setUseCaches(false);
-                connection.setConnectTimeout(3000);
-                connection.setReadTimeout(5000);
+                boolean usbFallback = "127.0.0.1".equals(url.getHost());
+                connection.setConnectTimeout(usbFallback ? 1_000 : 12_000);
+                connection.setReadTimeout(usbFallback ? 1_500 : 20_000);
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("Accept", "application/json");
                 connection.setRequestProperty("Cache-Control", "no-cache");
@@ -203,10 +206,14 @@ public class MainActivity extends Activity {
                         : connection.getErrorStream();
                 String body = readFully(stream);
                 if (code < 200 || code >= 300) {
+                    Log.w(TAG, "Usage HTTP " + code + " from " + url.getHost());
                     return offline("SERVER " + code);
                 }
-                return UsageData.fromJson(new JSONObject(body));
-            } catch (Exception ignored) {
+                UsageData data = UsageData.fromJson(new JSONObject(body));
+                Log.i(TAG, "Usage synced from " + url.getHost());
+                return data;
+            } catch (Exception error) {
+                Log.w(TAG, "Usage request failed: " + error.getClass().getSimpleName());
                 return offline("OFFLINE");
             } finally {
                 if (connection != null) {
