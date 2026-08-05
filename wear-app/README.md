@@ -44,7 +44,7 @@
 app\src\debug\res\values\codex_watch_local.xml
 ```
 
-这个文件被 Git 忽略，不会上传。debug APK 构建时会自动使用它覆盖公开默认地址和 token。脚本也会同步更新根目录的 `codex-watch-token.txt`。
+脚本会同时生成 Git 忽略的 debug 与 release 覆盖文件，不会上传；两种 APK 构建时都会使用它们覆盖公开默认地址和 token。脚本也会同步更新根目录的 `codex-watch-token.txt`。
 
 如果要修改公开默认资源，可以传入 `-PublicDefaults`，但开源发布前通常不需要这样做。
 
@@ -75,6 +75,15 @@ Copy-Item .\keystore.properties.example .\keystore.properties
 notepad .\keystore.properties
 ..\build-release-apk.ps1
 ```
+
+也可以从仓库根目录一次性生成新的固定签名。脚本使用系统加密随机数生成密码，不会把密码打印到终端，并拒绝覆盖现有签名：
+
+```powershell
+.\initialize-release-signing.ps1
+.\build-release-apk.ps1
+```
+
+生成后必须安全备份 `private-signing\codex-pet-watch-release.jks` 与 `wear-app\keystore.properties` 两个私密文件。
 
 `keystore.properties`、`*.jks` 与 `*.keystore` 都被 Git 忽略。发布后必须始终使用同一份 keystore；丢失它将无法继续覆盖升级已安装应用。构建脚本会验证 release APK 确实带有签名。
 

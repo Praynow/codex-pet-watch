@@ -4,6 +4,7 @@ config.local.ps1
 .env.*
 codex-watch-token.txt
 keystore.properties
+private-signing/
 *.keystore
 *.jks
 *.p12
@@ -25,6 +26,7 @@ wear-app/.gradle/
 wear-app/local.properties
 wear-app/app/build/
 wear-app/app/src/debug/res/values/codex_watch_local.xml
+wear-app/app/src/release/res/values/codex_watch_local.xml
 wear-app/app/src/debug/assets/pets/
 
 # Large local toolchains. Use Android Studio, system tools, or keep this folder locally.

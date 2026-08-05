@@ -15,8 +15,11 @@ if (Test-Path $configLoader) {
 }
 
 $mainStringsPath = Join-Path $scriptDir "app\src\main\res\values\strings.xml"
-$localStringsPath = Join-Path $scriptDir "app\src\debug\res\values\codex_watch_local.xml"
-$stringsPath = if ($PublicDefaults) { $mainStringsPath } else { $localStringsPath }
+$localStringsPaths = @(
+    (Join-Path $scriptDir "app\src\debug\res\values\codex_watch_local.xml"),
+    (Join-Path $scriptDir "app\src\release\res\values\codex_watch_local.xml")
+)
+$stringsPaths = if ($PublicDefaults) { @($mainStringsPath) } else { $localStringsPaths }
 $tokenPath = Join-Path $projectDir "codex-watch-token.txt"
 $port = if ($env:CODEX_WATCH_PORT) { $env:CODEX_WATCH_PORT } else { "8765" }
 
@@ -121,22 +124,16 @@ if (-not $Url -and -not $Urls -and -not $Token) {
     }
 }
 
-Ensure-StringResourceFile $stringsPath
-[xml]$xml = Get-Content $stringsPath
 if ($Url -and -not $Urls) {
     $Urls = @(Normalize-UsageUrl $Url)
 }
 
 if ($Urls) {
     $Urls = $Urls | ForEach-Object { Normalize-UsageUrl $_ } | Where-Object { $_ } | Select-Object -Unique
-    $urlsNode = Get-OrAddStringNode -Xml $xml -Name "codex_usage_urls"
-    $urlsNode.InnerText = ($Urls -join ",")
     Write-Host "Updated codex_usage_urls to $($Urls -join ',')" -ForegroundColor Green
 }
 
 if ($Token) {
-    $tokenNode = Get-OrAddStringNode -Xml $xml -Name "codex_watch_token"
-    $tokenNode.InnerText = $Token
     Write-Host "Updated codex_watch_token." -ForegroundColor Green
     if (-not $PublicDefaults) {
         Set-Content -Path $tokenPath -Value $Token
@@ -144,9 +141,22 @@ if ($Token) {
     }
 }
 
-$xml.Save($stringsPath)
+foreach ($stringsPath in $stringsPaths) {
+    Ensure-StringResourceFile $stringsPath
+    [xml]$xml = Get-Content $stringsPath
+    if ($Urls) {
+        $urlsNode = Get-OrAddStringNode -Xml $xml -Name "codex_usage_urls"
+        $urlsNode.InnerText = ($Urls -join ",")
+    }
+    if ($Token) {
+        $tokenNode = Get-OrAddStringNode -Xml $xml -Name "codex_watch_token"
+        $tokenNode.InnerText = $Token
+    }
+    $xml.Save($stringsPath)
+}
+
 if ($PublicDefaults) {
-    Write-Host "Wrote public default resources: $stringsPath" -ForegroundColor Cyan
+    Write-Host "Wrote public default resources: $mainStringsPath" -ForegroundColor Cyan
 } else {
-    Write-Host "Wrote local debug resources: $stringsPath" -ForegroundColor Cyan
+    Write-Host "Wrote local debug and release resources." -ForegroundColor Cyan
 }
