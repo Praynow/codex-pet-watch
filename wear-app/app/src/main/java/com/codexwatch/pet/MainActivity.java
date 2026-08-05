@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private CodexWatchView watchView;
     private UsageClient usageClient;
+    private AppUpdateManager updateManager;
 
     private final Runnable refreshRunnable = new Runnable() {
         @Override
@@ -69,10 +70,30 @@ public class MainActivity extends Activity {
             }
         });
         usageClient = new UsageClient(getString(R.string.codex_usage_urls), getString(R.string.codex_watch_token));
+        updateManager = new AppUpdateManager(
+                this,
+                getString(R.string.codex_update_metadata_url),
+                getString(R.string.codex_watch_token),
+                new AppUpdateManager.Listener() {
+                    @Override
+                    public void onStatus(String label, String detail, boolean error) {
+                        watchView.setUpdateStatus(label, detail, error);
+                    }
+                }
+        );
+        watchView.setUpdateTapHandler(new Runnable() {
+            @Override
+            public void run() {
+                updateManager.checkForUpdate();
+            }
+        });
         setContentView(watchView);
 
         refreshUsage();
         scheduleNextRefresh();
+        if (updateManager != null) {
+            updateManager.onResume();
+        }
     }
 
     @Override
@@ -92,6 +113,9 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         executor.shutdownNow();
+        if (updateManager != null) {
+            updateManager.close();
+        }
         super.onDestroy();
     }
 
@@ -583,12 +607,16 @@ public class MainActivity extends Activity {
         private Bitmap sprite;
         private UsageData usage = UsageData.demo();
         private Runnable tapHandler;
+        private Runnable updateTapHandler;
         private int page = PAGE_USAGE;
         private int playActionIndex = 0;
         private int resetCardGroupIndex = 0;
         private String loadedPetId = "";
         private float downX;
         private float downY;
+        private String updateLabel = "CHECK";
+        private String updateDetail = "Tap to check";
+        private boolean updateError;
 
         CodexWatchView(Context context, UserSettings settings) {
             super(context);
@@ -612,6 +640,17 @@ public class MainActivity extends Activity {
 
         void setTapHandler(Runnable tapHandler) {
             this.tapHandler = tapHandler;
+        }
+
+        void setUpdateTapHandler(Runnable updateTapHandler) {
+            this.updateTapHandler = updateTapHandler;
+        }
+
+        void setUpdateStatus(String label, String detail, boolean error) {
+            updateLabel = label;
+            updateDetail = detail;
+            updateError = error;
+            invalidate();
         }
 
         @Override
@@ -711,19 +750,26 @@ public class MainActivity extends Activity {
 
         private void drawSettingsFace(Canvas canvas) {
             drawTitle(canvas, "Settings");
-            drawPetFrame(canvas, 3, 4, 154, 49, 238, 140);
-            drawSettingRow(canvas, 154, "PET", catalog.selected(settings).displayName, COL_GREEN);
-            drawSettingRow(canvas, 210, "MODEL (AUTO)", usage.model, COL_BLUE);
+            drawPetFrame(canvas, 3, 4, 160, 43, 232, 115);
+            drawSettingRow(canvas, 120, "PET", catalog.selected(settings).displayName, COL_GREEN);
+            drawSettingRow(canvas, 168, "MODEL (AUTO)", usage.model, COL_BLUE);
             int groups = usage.resetCardGroupCount();
             String resetLabel = groups > 1
                     ? "RESET CARDS " + (resetCardGroupIndex + 1) + "/" + groups
                     : "RESET CARDS";
             drawResetCardRow(
                     canvas,
-                    266,
+                    216,
                     resetLabel,
                     usage.resetCardDetailAt(resetCardGroupIndex),
                     usage.resetCardUrgentAt(resetCardGroupIndex) ? COL_RED : COL_GREEN
+            );
+            drawResetCardRow(
+                    canvas,
+                    264,
+                    "UPDATE " + updateLabel,
+                    updateDetail,
+                    updateError ? COL_RED : COL_GREEN
             );
         }
 
@@ -1037,11 +1083,13 @@ public class MainActivity extends Activity {
 
         private void handleSettingsTap(float y) {
             boolean changed = true;
-            if (y >= 148 && y <= 202) {
+            if (y >= 116 && y <= 166) {
                 settings.nextPet(catalog.size());
                 loadSprite();
-            } else if (y >= 260 && y <= 318 && usage.resetCardGroupCount() > 1) {
+            } else if (y >= 212 && y <= 262 && usage.resetCardGroupCount() > 1) {
                 resetCardGroupIndex = (resetCardGroupIndex + 1) % usage.resetCardGroupCount();
+            } else if (y >= 264 && y <= 316 && updateTapHandler != null) {
+                updateTapHandler.run();
             } else {
                 changed = false;
             }

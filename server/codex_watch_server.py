@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import math
@@ -20,6 +21,7 @@ from codex_usage_reader import CodexUsageReader
 APP_NAME = "Codex Watch Server"
 DEFAULT_PORT = 8765
 DEFAULT_SYNC_MAX_AGE_SECONDS = 300
+DEFAULT_UPDATE_APK_URL = "https://watch.sadjuly.xyz/downloads/codex-pet-watch.apk"
 
 
 def load_codexbar_module(path: Path):
@@ -319,6 +321,60 @@ def make_payload(
     }
 
 
+def parse_boolean(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def configured_update_apk(server: Any) -> Path | None:
+    raw_path = str(getattr(server, "update_apk_path", "") or "").strip()
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser().resolve()
+    if not path.is_file() or path.suffix.lower() != ".apk":
+        return None
+    return path
+
+
+def make_update_metadata(server: Any) -> dict[str, Any] | None:
+    apk_path = configured_update_apk(server)
+    if apk_path is None:
+        return None
+
+    apk_url = str(getattr(server, "update_apk_url", "") or "").strip()
+    parsed_url = urlparse(apk_url)
+    if (
+        parsed_url.scheme.lower() != "https"
+        or not parsed_url.netloc
+        or parsed_url.username is not None
+        or parsed_url.password is not None
+        or parsed_url.query
+        or parsed_url.fragment
+    ):
+        raise ValueError("CODEX_WATCH_UPDATE_APK_URL must be a clean HTTPS URL")
+
+    version_code = int(getattr(server, "update_version_code", 0) or 0)
+    version_name = str(getattr(server, "update_version_name", "") or "").strip()
+    if version_code <= 0 or not version_name:
+        raise ValueError("Update version metadata is invalid")
+
+    return {
+        "version_code": version_code,
+        "version_name": version_name,
+        "apk_url": apk_url,
+        "sha256": sha256_file(apk_path),
+        "required": bool(getattr(server, "update_required", False)),
+        "notes": str(getattr(server, "update_notes", "") or "").strip(),
+    }
+
+
 class CodexWatchHandler(BaseHTTPRequestHandler):
     server_version = "CodexWatchServer/0.1"
 
@@ -355,6 +411,20 @@ class CodexWatchHandler(BaseHTTPRequestHandler):
                 print(f"usage generation failed: {type(exc).__name__}", file=sys.stderr)
                 self.write_json({"error": "usage unavailable"}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
+        if parsed.path == "/update":
+            try:
+                payload = make_update_metadata(self.server)
+                if payload is None:
+                    self.write_json({"error": "update unavailable"}, HTTPStatus.NOT_FOUND)
+                else:
+                    self.write_json(payload)
+            except Exception as exc:
+                print(f"update metadata failed: {type(exc).__name__}", file=sys.stderr)
+                self.write_json({"error": "update unavailable"}, HTTPStatus.SERVICE_UNAVAILABLE)
+            return
+        if parsed.path == "/downloads/codex-pet-watch.apk":
+            self.write_update_apk()
+            return
 
         self.write_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
@@ -378,6 +448,37 @@ class CodexWatchHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def write_update_apk(self) -> None:
+        apk_path = configured_update_apk(self.server)
+        if apk_path is None:
+            self.write_json({"error": "update unavailable"}, HTTPStatus.NOT_FOUND)
+            return
+        try:
+            size = apk_path.stat().st_size
+            if size <= 0:
+                raise ValueError("APK is empty")
+        except Exception as exc:
+            print(f"update download failed: {type(exc).__name__}", file=sys.stderr)
+            self.write_json({"error": "update unavailable"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        try:
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/vnd.android.package-archive")
+            self.send_header("Content-Length", str(size))
+            self.send_header("Content-Disposition", 'attachment; filename="codex-pet-watch.apk"')
+            self.send_header("Cache-Control", "private, max-age=300, no-transform")
+            self.send_header("Vary", "X-Codex-Watch-Token")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            with apk_path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(64 * 1024), b""):
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        except Exception as exc:
+            print(f"update download failed: {type(exc).__name__}", file=sys.stderr)
 
 
 def parse_args() -> argparse.Namespace:
@@ -426,6 +527,12 @@ def main() -> None:
     httpd.max_age_seconds = args.max_age_seconds
     httpd.reset_card_expires_at = args.reset_card_expires_at
     httpd.reset_cards_json = args.reset_cards_json
+    httpd.update_apk_path = os.environ.get("CODEX_WATCH_UPDATE_APK_PATH", "")
+    httpd.update_apk_url = os.environ.get("CODEX_WATCH_UPDATE_APK_URL", DEFAULT_UPDATE_APK_URL)
+    httpd.update_version_code = int(os.environ.get("CODEX_WATCH_UPDATE_VERSION_CODE", "2"))
+    httpd.update_version_name = os.environ.get("CODEX_WATCH_UPDATE_VERSION_NAME", "0.2.0")
+    httpd.update_required = parse_boolean(os.environ.get("CODEX_WATCH_UPDATE_REQUIRED", "false"))
+    httpd.update_notes = os.environ.get("CODEX_WATCH_UPDATE_NOTES", "")
     httpd.quiet = args.quiet
 
     print(f"{APP_NAME} listening on http://{args.host}:{args.port}/usage")

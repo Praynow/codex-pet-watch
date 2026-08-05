@@ -37,6 +37,19 @@ $env:CODEX_WATCH_RESET_CARDS_JSON = '[]'
 $env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
 ```
 
+应用内更新端点默认关闭。只有在私密 `config.local.ps1` 中配置一个有效 APK 路径后才会启用：
+
+```powershell
+$env:CODEX_WATCH_UPDATE_APK_PATH = "C:\private\releases\codex-pet-watch.apk"
+$env:CODEX_WATCH_UPDATE_APK_URL = "https://your-domain.example.com/downloads/codex-pet-watch.apk"
+$env:CODEX_WATCH_UPDATE_VERSION_CODE = "2"
+$env:CODEX_WATCH_UPDATE_VERSION_NAME = "0.2.0"
+$env:CODEX_WATCH_UPDATE_REQUIRED = "false"
+$env:CODEX_WATCH_UPDATE_NOTES = "Secure in-app update"
+```
+
+服务会从 APK 文件实时计算 SHA-256；不要手工配置哈希。元数据与 APK 下载都沿用 `X-Codex-Watch-Token` 认证，URL 不接受查询参数中的 token。APK 响应包含明确的 Content-Type、Content-Length、私有缓存策略和 `nosniff`。
+
 `CODEX_WATCH_RESET_CARDS_JSON` 用于记录多张卡，可按到期时间分组，例如：
 
 ```powershell
@@ -67,6 +80,8 @@ token 留空时，启动脚本会自动生成根目录的 `codex-watch-token.txt
 
 - `http://127.0.0.1:8765/health`
 - `http://127.0.0.1:8765/usage`
+- `http://127.0.0.1:8765/update`（未配置 APK 时返回 404）
+- `http://127.0.0.1:8765/downloads/codex-pet-watch.apk`（未配置 APK 时返回 404）
 
 检查一次 JSON 输出：
 

@@ -2,4 +2,5 @@
   <string name="app_name">Codex Pet</string>
   <string name="codex_usage_urls">http://127.0.0.1:8765/usage</string>
   <string name="codex_watch_token"></string>
+  <string name="codex_update_metadata_url">https://watch.sadjuly.xyz/update</string>
 </resources>

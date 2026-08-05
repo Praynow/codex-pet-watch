@@ -30,5 +30,14 @@ $env:CODEX_WATCH_RESET_CARDS_JSON = '[]'
 # Legacy single-card setting. Used only when CODEX_WATCH_RESET_CARDS_JSON is empty.
 $env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
 
+# Optional in-app update deployment. The APK path is private machine state.
+# The endpoint stays unavailable until CODEX_WATCH_UPDATE_APK_PATH points to a valid APK.
+$env:CODEX_WATCH_UPDATE_APK_PATH = ""
+$env:CODEX_WATCH_UPDATE_APK_URL = "https://your-domain.example.com/downloads/codex-pet-watch.apk"
+$env:CODEX_WATCH_UPDATE_VERSION_CODE = "2"
+$env:CODEX_WATCH_UPDATE_VERSION_NAME = "0.2.0"
+$env:CODEX_WATCH_UPDATE_REQUIRED = "false"
+$env:CODEX_WATCH_UPDATE_NOTES = ""
+
 # Optional Cloudflare named tunnel token.
 $env:CLOUDFLARED_TUNNEL_TOKEN = ""

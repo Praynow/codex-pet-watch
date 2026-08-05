@@ -11,6 +11,14 @@ if (-not $env:JAVA_HOME -and $localJdk) {
     $env:JAVA_HOME = $localJdk.FullName
 }
 
+$microsoftJdkRoot = Join-Path $env:ProgramFiles "Microsoft"
+$installedJdk = Get-ChildItem $microsoftJdkRoot -Directory -Filter "jdk-17*" -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending |
+    Select-Object -First 1
+if (-not $env:JAVA_HOME -and $installedJdk) {
+    $env:JAVA_HOME = $installedJdk.FullName
+}
+
 $java = Get-Command java -ErrorAction SilentlyContinue
 if (-not $env:JAVA_HOME -and -not $java) {
     throw "JDK not found. Install JDK 17+ or place it under tools\jdk."
@@ -48,8 +56,20 @@ if (Test-Path $localGradle) {
     throw "Gradle not found. Keep wear-app\gradlew.bat in the repository or install Gradle."
 }
 
-Set-Location (Join-Path $projectDir "wear-app")
-& $gradle :app:assembleDebug --no-daemon --no-watch-fs
+$gradleExitCode = 0
+Push-Location (Join-Path $projectDir "wear-app")
+try {
+    & $gradle :app:assembleDebug --no-daemon --no-watch-fs
+    $gradleExitCode = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+if ($gradleExitCode -ne 0) {
+    throw "Gradle debug build failed with exit code $gradleExitCode."
+}
 
 $apk = Join-Path $projectDir "wear-app\app\build\outputs\apk\debug\app-debug.apk"
+if (-not (Test-Path -LiteralPath $apk)) {
+    throw "Gradle completed without producing the expected debug APK."
+}
 Write-Host "APK ready: $apk" -ForegroundColor Green

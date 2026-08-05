@@ -3,6 +3,7 @@ config.local.ps1
 .env
 .env.*
 codex-watch-token.txt
+keystore.properties
 *.keystore
 *.jks
 *.p12

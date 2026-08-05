@@ -9,6 +9,7 @@
 - 内置代码占位宠物，并自动加载项目中已确认用于手表的宠物 spritesheet。
 - 可继续添加有授权的宠物 spritesheet；互动页覆盖 9 个标准动作状态。
 - 用量、互动、设置三个页面。
+- 设置页支持通过受控 HTTPS 元数据检查更新、校验 APK SHA-256，并交给系统安装器请求用户确认。
 - 依次尝试多个服务地址。
 - 服务不可达时保留最后一次有效数据并显示离线状态。
 - 数据超过 5 分钟未刷新时显示 `STALE`。
@@ -62,6 +63,22 @@ APK 输出：
 ```text
 wear-app\app\build\outputs\apk\debug\app-debug.apk
 ```
+
+源码版本为 `versionCode 2`、`versionName 0.2.0`。debug APK 使用 Android debug 证书，仅用于覆盖已有 debug 安装。
+
+## 固定 release 签名
+
+复制不含秘密的模板，并把 keystore 放在私密、已备份的位置：
+
+```powershell
+Copy-Item .\keystore.properties.example .\keystore.properties
+notepad .\keystore.properties
+..\build-release-apk.ps1
+```
+
+`keystore.properties`、`*.jks` 与 `*.keystore` 都被 Git 忽略。发布后必须始终使用同一份 keystore；丢失它将无法继续覆盖升级已安装应用。构建脚本会验证 release APK 确实带有签名。
+
+更新元数据固定从 `https://watch.sadjuly.xyz/update` 读取；APK URL 也必须是无用户信息、无查询参数的 HTTPS URL。两次请求都通过 `X-Codex-Watch-Token` 请求头认证。下载完成后校验 SHA-256，随后使用 Android `PackageInstaller` 打开系统确认界面；应用不会尝试静默安装。
 
 ## 宠物素材与动作
 
