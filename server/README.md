@@ -42,8 +42,8 @@ $env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
 ```powershell
 $env:CODEX_WATCH_UPDATE_APK_PATH = "C:\private\releases\codex-pet-watch.apk"
 $env:CODEX_WATCH_UPDATE_APK_URL = "https://your-domain.example.com/downloads/codex-pet-watch.apk"
-$env:CODEX_WATCH_UPDATE_VERSION_CODE = "3"
-$env:CODEX_WATCH_UPDATE_VERSION_NAME = "0.2.1"
+$env:CODEX_WATCH_UPDATE_VERSION_CODE = "4"
+$env:CODEX_WATCH_UPDATE_VERSION_NAME = "0.2.2"
 $env:CODEX_WATCH_UPDATE_REQUIRED = "false"
 $env:CODEX_WATCH_UPDATE_NOTES = "Secure in-app update"
 ```

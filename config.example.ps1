@@ -34,8 +34,8 @@ $env:CODEX_WATCH_RESET_CARD_EXPIRES_AT = ""
 # The endpoint stays unavailable until CODEX_WATCH_UPDATE_APK_PATH points to a valid APK.
 $env:CODEX_WATCH_UPDATE_APK_PATH = ""
 $env:CODEX_WATCH_UPDATE_APK_URL = "https://your-domain.example.com/downloads/codex-pet-watch.apk"
-$env:CODEX_WATCH_UPDATE_VERSION_CODE = "2"
-$env:CODEX_WATCH_UPDATE_VERSION_NAME = "0.2.0"
+$env:CODEX_WATCH_UPDATE_VERSION_CODE = "4"
+$env:CODEX_WATCH_UPDATE_VERSION_NAME = "0.2.2"
 $env:CODEX_WATCH_UPDATE_REQUIRED = "false"
 $env:CODEX_WATCH_UPDATE_NOTES = ""
 

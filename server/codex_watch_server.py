@@ -529,8 +529,8 @@ def main() -> None:
     httpd.reset_cards_json = args.reset_cards_json
     httpd.update_apk_path = os.environ.get("CODEX_WATCH_UPDATE_APK_PATH", "")
     httpd.update_apk_url = os.environ.get("CODEX_WATCH_UPDATE_APK_URL", DEFAULT_UPDATE_APK_URL)
-    httpd.update_version_code = int(os.environ.get("CODEX_WATCH_UPDATE_VERSION_CODE", "3"))
-    httpd.update_version_name = os.environ.get("CODEX_WATCH_UPDATE_VERSION_NAME", "0.2.1")
+    httpd.update_version_code = int(os.environ.get("CODEX_WATCH_UPDATE_VERSION_CODE", "4"))
+    httpd.update_version_name = os.environ.get("CODEX_WATCH_UPDATE_VERSION_NAME", "0.2.2")
     httpd.update_required = parse_boolean(os.environ.get("CODEX_WATCH_UPDATE_REQUIRED", "false"))
     httpd.update_notes = os.environ.get("CODEX_WATCH_UPDATE_NOTES", "")
     httpd.quiet = args.quiet
