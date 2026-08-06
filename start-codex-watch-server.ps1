@@ -38,6 +38,36 @@ function Get-CodexWatchServerProcess {
     return $processInfo
 }
 
+function Repair-DuplicateProcessEnvironmentNames {
+    $variables = [System.Environment]::GetEnvironmentVariables()
+    $groups = @($variables.Keys | Group-Object { ([string]$_).ToLowerInvariant() } | Where-Object Count -gt 1)
+    foreach ($group in $groups) {
+        $keys = @($group.Group | ForEach-Object { [string]$_ })
+        $preferredKey = $keys | Where-Object { $_ -ceq "Path" } | Select-Object -First 1
+        if (-not $preferredKey) {
+            $preferredKey = $keys[0]
+        }
+        if ($group.Name -eq "path") {
+            $segments = New-Object System.Collections.Generic.List[string]
+            foreach ($key in $keys) {
+                foreach ($segment in ([string]$variables[$key] -split ";")) {
+                    $trimmed = $segment.Trim()
+                    if ($trimmed -and -not $segments.Contains($trimmed)) {
+                        $segments.Add($trimmed)
+                    }
+                }
+            }
+            $value = $segments -join ";"
+        } else {
+            $value = [string]$variables[$preferredKey]
+        }
+        foreach ($key in $keys) {
+            [System.Environment]::SetEnvironmentVariable($key, $null, "Process")
+        }
+        [System.Environment]::SetEnvironmentVariable($preferredKey, $value, "Process")
+    }
+}
+
 if (Test-Path $pidPath) {
     $existingPidText = (Get-Content $pidPath -Raw).Trim()
     $existingPid = 0
@@ -88,6 +118,7 @@ $hadTokenEnvironment = Test-Path Env:CODEX_WATCH_TOKEN
 $previousTokenEnvironment = $env:CODEX_WATCH_TOKEN
 $env:CODEX_WATCH_TOKEN = $token
 try {
+    Repair-DuplicateProcessEnvironmentNames
     $process = Start-Process -FilePath "python" -ArgumentList $arguments -WorkingDirectory $projectDir -RedirectStandardOutput $outPath -RedirectStandardError $errPath -WindowStyle Hidden -PassThru
 } finally {
     if ($hadTokenEnvironment) {
